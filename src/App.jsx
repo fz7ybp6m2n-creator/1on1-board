@@ -51,6 +51,7 @@ export default function OneOnOneBoard() {
     fetchMembers();
   }, []);
 
+  // ★ 削除命令も送れるように修正した保存関数
   const persistMembers = useCallback(async (next) => {
     setMembers(next);
     setErrorMessage("");
@@ -169,8 +170,24 @@ function MembersTab({ members, setMembers }) {
     setExpandedId(m.id);
   };
 
-  const removeMember = (id) => {
+  // ★ メンバー削除時にスプレッドシート（GAS）からも削除する処理を追加
+  const removeMember = async (id) => {
+    // まず画面上のステートから消去
     setMembers(members.filter((m) => m.id !== id));
+
+    // GASへ削除リクエストを送信
+    try {
+      await fetch(GAS_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          action: "deleteMember",
+          payload: { id: id }
+        })
+      });
+    } catch (e) {
+      console.error("スプレッドシートの削除に失敗しました", e);
+    }
   };
 
   const updateMember = (id, patch) => {
@@ -280,36 +297,35 @@ function MemberCard({ member, expanded, onToggle, onRemove, onUpdate }) {
             </div>
           ))}
 
-          {/* 横スクロールを許可する親要素を追加 */}
-            <div className="w-full overflow-x-auto pt-1 pb-1 scrollbar-none">
-              {/* grid幅が小さくなりすぎないよう min-w-[340px] を指定 */}
-              <div className="grid grid-cols-[1fr_75px_60px_36px] gap-2 items-center min-w-[340px]">
-                <input
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                  placeholder="項目名（例：紹介数）"
-                  className="bg-[#21262D] border border-[#30363D] rounded-lg px-2.5 py-2 text-xs placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
-                />
-                <input
-                  value={target}
-                  onChange={(e) => setTarget(e.target.value.replace(/[^0-9.]/g, ""))}
-                  placeholder="目標"
-                  inputMode="decimal"
-                  className="bg-[#21262D] border border-[#30363D] rounded-lg px-2.5 py-2 text-xs text-center placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
-                />
-                <input
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  className="bg-[#21262D] border border-[#30363D] rounded-lg px-2.5 py-2 text-xs text-center focus:outline-none focus:border-[#F2B04B]"
-                />
-                <button
-                  onClick={addItem}
-                  className="bg-[#30363D] hover:bg-[#484F58] border border-[#484F58] rounded-lg h-full flex items-center justify-center active:scale-95 transition-all"
-                >
-                  <Plus size={15} className="text-[#F2B04B]" />
-                </button>
-              </div>
+          {/* 横スクロール対応の入力要素 */}
+          <div className="w-full overflow-x-auto pt-1 pb-1 scrollbar-none">
+            <div className="grid grid-cols-[1fr_75px_60px_36px] gap-2 items-center min-w-[340px]">
+              <input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="項目名（例：紹介数）"
+                className="bg-[#21262D] border border-[#30363D] rounded-lg px-2.5 py-2 text-xs placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
+              />
+              <input
+                value={target}
+                onChange={(e) => setTarget(e.target.value.replace(/[^0-9.]/g, ""))}
+                placeholder="目標"
+                inputMode="decimal"
+                className="bg-[#21262D] border border-[#30363D] rounded-lg px-2.5 py-2 text-xs text-center placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
+              />
+              <input
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                className="bg-[#21262D] border border-[#30363D] rounded-lg px-2.5 py-2 text-xs text-center focus:outline-none focus:border-[#F2B04B]"
+              />
+              <button
+                onClick={addItem}
+                className="bg-[#30363D] hover:bg-[#484F58] border border-[#484F58] rounded-lg h-full flex items-center justify-center active:scale-95 transition-all"
+              >
+                <Plus size={15} className="text-[#F2B04B]" />
+              </button>
             </div>
+          </div>
 
           <div className="pt-2 flex justify-end">
             <button
@@ -456,7 +472,6 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
           </button>
         ))}
       </div>
-
       {/* 週指定入力 */}
       <div className="flex items-center gap-2.5 bg-[#161B22] border border-[#30363D] rounded-xl px-3.5 py-2.5 text-xs text-[#C9D1D9]">
         <Calendar size={15} className="text-[#8B949E] shrink-0" />
@@ -837,12 +852,3 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
     </div>
   );
 }
-{/* 親要素に overflow-x-auto を指定 */}
-<div className="overflow-x-auto">
-  {/* 内側の要素に min-w-form を指定 */}
-  <div className="min-w-form" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-    <input type="text" placeholder="項目名（例：紹介数）" />
-    <input type="number" placeholder="目標" />
-    <span>件</span>
-  </div>
-</div>
