@@ -833,3 +833,12 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
     </div>
   );
 }
+{/* 親要素に overflow-x-auto を指定 */}
+<div className="overflow-x-auto">
+  {/* 内側の要素に min-w-form を指定 */}
+  <div className="min-w-form" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+    <input type="text" placeholder="項目名（例：紹介数）" />
+    <input type="number" placeholder="目標" />
+    <span>件</span>
+  </div>
+</div>

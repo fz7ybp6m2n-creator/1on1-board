@@ -182,3 +182,13 @@
     border-right-color: var(--border);
   }
 }
+/* --- スマホ用横スクロール設定 --- */
+.overflow-x-auto {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch; /* スマホで滑らかにスクロールさせる設定 */
+  width: 100%;
+}
+
+.min-w-form {
+  min-width: 340px; /* 入力欄が潰れない最小幅 */
+}
