@@ -802,8 +802,11 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
   // 月別データ（月ごとの最終レコードを集計）
   const monthlyMap = {};
   records.forEach((r) => {
-    const match = r.week ? r.week.match(/(\d{4}年\d{1,2}月|\d{4}-\d{2})/) : null;
-    const monthKey = match ? match[1] : r.week;
+    if (!r.week) return;
+
+    const match = r.week.match(/(\d{1,2})[\/\-月]/);
+    const monthKey = match ? `${match[1]}月` : r.week;
+    
     monthlyMap[monthKey] = r.achievementRate;
   });
 
