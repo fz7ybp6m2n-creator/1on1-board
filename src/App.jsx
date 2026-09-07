@@ -765,6 +765,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
 function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [historyViewMode, setHistoryViewMode] = useState("week");
 
   const member = members.find((m) => m.id === selectedMemberId);
 
@@ -792,10 +793,27 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
     );
   }
 
-  const chartData = records.map((r) => ({
-    week: r.week,
+  // 週別データ
+  const weeklyChartData = records.map((r) => ({
+    label: r.week,
     rate: r.achievementRate
   }));
+
+  // 月別データ（月ごとの最終レコードを集計）
+  const monthlyMap = {};
+  records.forEach((r) => {
+    const match = r.week ? r.week.match(/(\d{4}年\d{1,2}月|\d{4}-\d{2})/) : null;
+    const monthKey = match ? match[1] : r.week;
+    monthlyMap[monthKey] = r.achievementRate;
+  });
+
+  const monthlyChartData = Object.keys(monthlyMap).map((key) => ({
+    label: key,
+    rate: monthlyMap[key]
+  }));
+
+  // ボタンで選択されているモード（週 / 月）に応じてグラフデータを自動切り替え
+  const chartData = historyViewMode === "week" ? weeklyChartData : monthlyChartData;
 
   return (
     <div className="pt-5 space-y-5">
@@ -823,12 +841,39 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
         </div>
       ) : (
         <>
+          {/* 週 / 月 の切り替えボタン */}
+          <div className="flex bg-[#161B22] border border-[#30363D] p-1 rounded-xl gap-1 mb-4">
+            <button
+              onClick={() => setHistoryViewMode("week")}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                historyViewMode === "week"
+                  ? "bg-[#F2B04B] text-[#0D1117] shadow-sm"
+                  : "text-[#8B949E] hover:text-[#C9D1D9]"
+              }`}
+            >
+              週ごとの推移
+            </button>
+            <button
+              onClick={() => setHistoryViewMode("month")}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                historyViewMode === "month"
+                  ? "bg-[#F2B04B] text-[#0D1117] shadow-sm"
+                  : "text-[#8B949E] hover:text-[#C9D1D9]"
+              }`}
+            >
+              月ごとの推移
+            </button>
+          </div>
+
           <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-4.5 shadow-sm">
-            <div className="text-xs font-bold text-[#C9D1D9] mb-3">達成率推移グラフ（%）</div>
+            <div className="text-xs font-bold text-[#C9D1D9] mb-3">
+              {historyViewMode === "week" ? "週別 達成率推移グラフ（%）" : "月別 達成率推移グラフ（%）"}
+            </div>
             <ResponsiveContainer width="100%" height={190}>
               <LineChart data={chartData} margin={{ top: 8, right: 12, left: -24, bottom: 0 }}>
                 <CartesianGrid stroke="#30363D" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="week" tick={{ fill: "#8B949E", fontSize: 10 }} axisLine={{ stroke: "#30363D" }} tickLine={false} />
+                {/* dataKey を label に変更 */}
+                <XAxis dataKey="label" tick={{ fill: "#8B949E", fontSize: 10 }} axisLine={{ stroke: "#30363D" }} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{ fill: "#8B949E", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <ReferenceLine y={70} stroke="#ED4245" strokeDasharray="4 4" />
                 <Tooltip
