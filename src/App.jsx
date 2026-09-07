@@ -818,8 +818,8 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
                   <span className="text-[#C9D1D9]">達成率: {rec.achievementRate}%</span>
                 </div>
                 {rec.reflection && (
-                  <div className="text-xs text-[#C9D1D9]">
-                    <span className="text-[#8B949E] font-medium">振り返り: </span>
+                  <div className="text-xs text-[#C9D1D9] whitespace-pre-wrap leading-relaxed">
+                    <span className="text-[#8B949E] font-medium block mb-0.5">振り返り:</span>
                     {rec.reflection}
                   </div>
                 )}
