@@ -882,8 +882,9 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
                 <Tooltip
                   contentStyle={{ background: "#161B22", border: "1px solid #30363D", borderRadius: 8, fontSize: 12, color: "#F0F6FC" }}
                   labelStyle={{ color: "#F2B04B", fontWeight: "bold" }}
+                  formatter={(value) => [`${value}%`, "達成率"]}
                 />
-                <Line type="monotone" dataKey="rate" stroke="#F2B04B" strokeWidth={2.5} dot={{ r: 4, fill: "#F2B04B" }} />
+              <Line type="monotone" dataKey="rate" name="達成率" stroke="#F2B04B" strokeWidth={2.5} dot={{ r: 4, fill: "#F2B04B" }} />
               </LineChart>
             </ResponsiveContainer>
             <div className="text-[10px] text-[#8B949E] mt-2 flex items-center gap-1.5">
