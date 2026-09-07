@@ -344,6 +344,7 @@ function MemberCard({ member, expanded, onToggle, onRemove, onUpdate }) {
 // ================= SHEET TAB =================
 function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
   const [week, setWeek] = useState(currentWeekLabel());
+  const [viewMode, setViewMode] = useState("week");
   const [achievements, setAchievements] = useState({});
   const [reflection, setReflection] = useState("");
   const [nextActions, setNextActions] = useState([{ when: "", who: "", what: "" }]);
@@ -482,6 +483,29 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
           className="bg-transparent flex-1 text-xs font-semibold text-[#F0F6FC] focus:outline-none"
         />
       </div>
+      <div className="flex bg-[#161B22] border border-[#30363D] p-1 rounded-xl gap-1">
+        <button
+          onClick={() => setViewMode("week")}
+          className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+            viewMode === "week"
+              ? "bg-[#F2B04B] text-[#0D1117] shadow-sm"
+              : "text-[#8B949E] hover:text-[#C9D1D9]"
+          }`}
+        >
+          週の達成率
+        </button>
+        <button
+          onClick={() => setViewMode("month")}
+          className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+            viewMode === "month"
+              ? "bg-[#F2B04B] text-[#0D1117] shadow-sm"
+              : "text-[#8B949E] hover:text-[#C9D1D9]"
+          }`}
+        >
+          月の達成率（累計）
+        </button>
+      </div>
+
 
       {member && (!member.items || member.items.length === 0) && (
         <div className="text-xs text-[#8B949E] text-center py-10 bg-[#161B22]/50 border border-[#30363D] rounded-xl">
@@ -560,16 +584,26 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
           <div className="bg-gradient-to-r from-[#161B22] to-[#21262D] border border-[#30363D] rounded-xl p-4.5 flex items-center justify-between shadow-sm">
             <div>
               <div className="text-[11px] font-bold text-[#8B949E] uppercase tracking-wider">
-                今週の平均達成率
+                {viewMode === "week" ? "今週の平均達成率" : "今月の累計達成率"}
               </div>
               <div className="text-3xl font-extrabold text-[#F2B04B] tabular-nums mt-0.5">
                 {avgRate}<span className="text-xl ml-0.5">%</span>
               </div>
             </div>
             <div className="text-right text-[11px] text-[#8B949E] leading-relaxed">
-              登録項目数：<span className="text-[#F0F6FC] font-semibold">{member.items.length}</span> 件
-              <br />
-              {week}
+              {viewMode === "week" ? (
+                <>
+                  登録項目数：<span className="text-[#F0F6FC] font-semibold">{member.items.length}</span> 件
+                  <br />
+                  {week}
+                </>
+              ) : (
+                <>
+                  月間累計モード
+                  <br />
+                  <span className="text-[#F0F6FC] font-semibold">最終週に向けて更新中</span>
+                </>
+              )}
             </div>
           </div>
 
