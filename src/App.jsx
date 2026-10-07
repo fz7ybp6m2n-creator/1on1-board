@@ -833,7 +833,7 @@ let avgRate = 0;
       )}
     </div>
   );
-}
+
 
 // ================= HISTORY TAB =================
 function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
