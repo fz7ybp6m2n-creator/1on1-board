@@ -1,26 +1,38 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, ChevronRight, Users, ClipboardList, TrendingUp, Save, X, Target, Calendar, AlertCircle } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
+import {
+  Plus,
+  Trash2,
+  ChevronRight,
+  ChevronUp,
+  ChevronDown,
+  Users,
+  ClipboardList,
+  TrendingUp,
+  Save,
+  X,
+  Target,
+  Calendar,
+  AlertCircle
+} from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine
+} from "recharts";
 
-const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxsLMkvdwgKjjhEiqbLYON7IwTeqsPGwfRMCD6B3ooiM01FvVyhkHMbCEVjheR7Pe-0Gw/exec";
-
-const uid = () => Math.random().toString(36).slice(2, 10);
+const GAS_API_URL =
+  "https://script.google.com/macros/s/AKfycbxsLMkvdwgKjjhEiqbLYON7IwTeqsPGwfRMCD6B3ooiM01FvVyhkHMbCEVjheR7Pe-0Gw/exec";
 
 const NAV_ITEMS = [
   { id: "members", label: "メンバー設定", icon: Users },
   { id: "sheet", label: "1on1シート", icon: ClipboardList },
   { id: "history", label: "達成率推移", icon: TrendingUp },
 ];
-
-function currentWeekLabel() {
-  const d = new Date();
-  const day = d.getDay();
-  const monday = new Date(d);
-  monday.setDate(d.getDate() - ((day + 6) % 7));
-  const m = monday.getMonth() + 1;
-  const dt = monday.getDate();
-  return `${m}/${dt}週`;
-}
 
 export default function OneOnOneBoard() {
   const [tab, setTab] = useState("members");
@@ -29,19 +41,38 @@ export default function OneOnOneBoard() {
   const [selectedMemberId, setSelectedMemberId] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
 
+  // itemsが文字列で戻ってきた場合に配列化するヘルパー
+  const parseMemberItems = (data) => {
+    if (!Array.isArray(data)) return [];
+    return data.map((m) => {
+      let items = m.items;
+      if (typeof items === "string") {
+        try {
+          items = JSON.parse(items);
+        } catch (e) {
+          items = [];
+        }
+      }
+      return { ...m, items: items || [] };
+    });
+  };
+
   const fetchMembers = useCallback(async () => {
     setLoading(true);
     setErrorMessage("");
     try {
       const res = await fetch(`${GAS_API_URL}?action=getMembers`);
       const data = await res.json();
-      setMembers(data || []);
-      if (data && data.length && !selectedMemberId) {
-        setSelectedMemberId(data[0].id);
+      const parsed = parseMemberItems(data);
+      setMembers(parsed);
+      if (parsed.length && !selectedMemberId) {
+        setSelectedMemberId(parsed[0].id);
       }
     } catch (e) {
       console.error(e);
-      setErrorMessage("メンバー情報の読み込みに失敗しました。GASのURLや通信状況を確認してください。");
+      setErrorMessage(
+        "メンバー情報の読み込みに失敗しました。GASのURLや通信状況を確認してください。"
+      );
     } finally {
       setLoading(false);
     }
@@ -94,7 +125,11 @@ export default function OneOnOneBoard() {
           </div>
         )}
         {tab === "members" && (
-          <MembersTab members={members} setMembers={persistMembers} />
+          <MemberSettingTab
+            members={members}
+            setMembers={persistMembers}
+            GAS_API_URL={GAS_API_URL}
+          />
         )}
         {tab === "sheet" && (
           <SheetTab
@@ -124,7 +159,9 @@ function Header() {
           <Target size={14} strokeWidth={2.5} />
           Weekly 1on1 Board
         </div>
-        <h1 className="text-xl font-bold tracking-tight text-[#F0F6FC]">達成率チェックシート</h1>
+        <h1 className="text-xl font-bold tracking-tight text-[#F0F6FC]">
+          達成率チェックシート
+        </h1>
       </div>
     </div>
   );
@@ -142,7 +179,9 @@ function BottomNav({ tab, setTab }) {
               key={item.id}
               onClick={() => setTab(item.id)}
               className={`flex-1 flex flex-col items-center gap-1.5 py-3 transition-all ${
-                active ? "text-[#F2B04B] font-semibold" : "text-[#8B949E] hover:text-[#C9D1D9]"
+                active
+                  ? "text-[#F2B04B] font-semibold"
+                  : "text-[#8B949E] hover:text-[#C9D1D9]"
               }`}
             >
               <Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
@@ -153,9 +192,7 @@ function BottomNav({ tab, setTab }) {
       </div>
     </div>
   );
-}import React, { useState } from "react";
-// アイコンが未定義でクラッシュするのを防ぐためインポートを追加
-import { Plus, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+}
 
 // ================= MEMBER SETTING TAB =================
 export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
@@ -194,7 +231,6 @@ export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
     }
   };
 
-  // メンバー名保存処理（GASへ変更を反映）
   const saveMemberName = async (memberId, updatedName) => {
     const trimmed = updatedName?.trim() || "";
     if (!trimmed) return;
@@ -207,7 +243,7 @@ export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
       payload: {
         id: memberId,
         name: trimmed,
-        items: targetMember.items || []
+        items: JSON.stringify(targetMember.items || [])
       }
     };
 
@@ -268,7 +304,11 @@ export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
     setLoading(true);
     const payload = {
       action: "saveMember",
-      payload: { id: targetMember.id, name: targetMember.name || "", items: newItems }
+      payload: {
+        id: targetMember.id,
+        name: targetMember.name || "",
+        items: JSON.stringify(newItems)
+      }
     };
 
     try {
@@ -302,7 +342,11 @@ export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
     setLoading(true);
     const payload = {
       action: "saveMember",
-      payload: { id: targetMember.id, name: targetMember.name || "", items: newItems }
+      payload: {
+        id: targetMember.id,
+        name: targetMember.name || "",
+        items: JSON.stringify(newItems)
+      }
     };
 
     try {
@@ -328,7 +372,7 @@ export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
   return (
     <div className="pt-5 space-y-5">
       <div className="text-xs text-[#8B949E] leading-relaxed bg-[#161B22] border border-[#30363D] rounded-xl p-3.5">
-        メンバーごとに追う目標項目（KPI）を登録します。データは全員共通で更新されます[cite: 3]。
+        メンバーごとに追う目標項目（KPI）を登録します。データは全員共通で更新されます。
       </div>
 
       <div className="flex gap-2">
@@ -351,7 +395,7 @@ export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
       <div className="space-y-3">
         {(members || []).map((m) => {
           const isOpen = openMemberId === m.id;
-          const items = m.items || [];
+          const items = Array.isArray(m.items) ? m.items : [];
 
           return (
             <div
@@ -367,7 +411,6 @@ export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
                     {m.name ? m.name.slice(0, 1) : "?"}
                   </div>
                   <div>
-                    {/* 名前編集用インプット */}
                     <input
                       type="text"
                       value={m.name || ""}
@@ -384,7 +427,7 @@ export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
                       className="bg-transparent font-bold text-xs text-[#F0F6FC] focus:outline-none focus:border-b focus:border-[#F2B04B] w-32"
                     />
                     <div className="text-[11px] text-[#8B949E] mt-0.5">
-                      目標項目：{items.length}件[cite: 3]
+                      目標項目：{items.length}件
                     </div>
                   </div>
                 </div>
@@ -404,7 +447,8 @@ export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
                         <span className="font-semibold text-[#F0F6FC]">
                           {it.label}{" "}
                           <span className="text-[#8B949E] font-normal ml-1">
-                            (目標: {it.target}{it.unit}/月)
+                            (目標: {it.target}
+                            {it.unit}/月)
                           </span>
                         </span>
                         <button
@@ -418,14 +462,19 @@ export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
                   </div>
 
                   <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-3 space-y-2.5">
-                    <div className="text-[11px] font-bold text-[#8B949E]">新しい目標項目を追加</div>
+                    <div className="text-[11px] font-bold text-[#8B949E]">
+                      新しい目標項目を追加
+                    </div>
                     <div className="flex gap-2">
                       <input
                         value={newItemLabels[m.id] || ""}
                         onChange={(e) =>
-                          setNewItemLabels({ ...newItemLabels, [m.id]: e.target.value })
+                          setNewItemLabels({
+                            ...newItemLabels,
+                            [m.id]: e.target.value
+                          })
                         }
-                        placeholder="項目名（例: 紹介数）[cite: 3]"
+                        placeholder="項目名（例: 紹介数）"
                         className="flex-1 bg-[#0D1117] border border-[#30363D] rounded-lg px-2.5 py-1.5 text-xs text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
                       />
                       <input
@@ -433,17 +482,20 @@ export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
                         onChange={(e) =>
                           setNewItemTargets({
                             ...newItemTargets,
-                            [m.id]: e.target.value.replace(/[^0-9]/g, ""),
+                            [m.id]: e.target.value.replace(/[^0-9]/g, "")
                           })
                         }
                         inputMode="numeric"
-                        placeholder="目標[cite: 3]"
+                        placeholder="目標"
                         className="w-14 bg-[#0D1117] border border-[#30363D] rounded-lg px-2.5 py-1.5 text-xs text-center text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
                       />
                       <select
                         value={newItemUnits[m.id] || "件"}
                         onChange={(e) =>
-                          setNewItemUnits({ ...newItemUnits, [m.id]: e.target.value })
+                          setNewItemUnits({
+                            ...newItemUnits,
+                            [m.id]: e.target.value
+                          })
                         }
                         className="w-16 bg-[#0D1117] border border-[#30363D] rounded-lg px-2 py-1.5 text-xs text-[#F0F6FC] focus:outline-none focus:border-[#F2B04B]"
                       >
@@ -468,7 +520,7 @@ export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
                       className="text-[11px] text-[#FF8585] hover:underline flex items-center gap-1 ml-auto font-medium"
                     >
                       <Trash2 size={12} />
-                      このメンバーを削除[cite: 3]
+                      このメンバーを削除
                     </button>
                   </div>
                 </div>
@@ -479,6 +531,15 @@ export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
       </div>
     </div>
   );
+}
+
+// 他のタブが未定義によるクラッシュを防ぐフォールバック用コンポーネント
+function SheetTab() {
+  return <div className="pt-5 text-xs text-[#8B949E]">1on1シートタブのコンテンツ</div>;
+}
+
+function HistoryTab() {
+  return <div className="pt-5 text-xs text-[#8B949E]">達成率推移タブのコンテンツ</div>;
 }
 
 // ================= SHEET TAB =================
