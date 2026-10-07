@@ -154,329 +154,183 @@ function BottomNav({ tab, setTab }) {
     </div>
   );
 }
-// ================= MEMBER SETTING TAB =================
-function MemberSettingTab({ members, setMembers, GAS_API_URL }) {
+
+// ================= MEMBERS TAB =================
+function MembersTab({ members, setMembers }) {
+  const [expandedId, setExpandedId] = useState(null);
   const [newName, setNewName] = useState("");
-  const [openMemberId, setOpenMemberId] = useState(members[0]?.id || null);
-  const [newItemLabels, setNewItemLabels] = useState({});
-  const [newItemTargets, setNewItemTargets] = useState({});
-  const [newItemUnits, setNewItemUnits] = useState({});
-  const [loading, setLoading] = useState(false);
 
-  const addMember = async () => {
-    if (!newName.trim()) return;
-    setLoading(true);
-    const payload = {
-      action: "saveMember",
-      payload: { name: newName.trim(), items: [] }
-    };
+  const addMember = () => {
+    const name = newName.trim();
+    if (!name) return;
+    const m = { id: uid(), name, items: [] };
+    setMembers([...members, m]);
+    setNewName("");
+    setExpandedId(m.id);
+  };
+
+  const removeMember = async (id) => {
+    setMembers(members.filter((m) => m.id !== id));
     try {
-      const res = await fetch(GAS_API_URL, {
+      await fetch(GAS_API_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          action: "deleteMember",
+          payload: { id: id }
+        })
       });
-      const result = await res.json();
-      if (result.status === "success") {
-        const listRes = await fetch(`${GAS_API_URL}?action=getMembers`);
-        const list = await listRes.json();
-        setMembers(list || []);
-        setNewName("");
-      }
     } catch (e) {
-      console.error(e);
-      alert("メンバーの追加に失敗しました");
-    } finally {
-      setLoading(false);
+      console.error("スプレッドシートの削除に失敗しました", e);
     }
   };
 
-  // メンバー名保存処理（GASへ変更を反映）
-  const saveMemberName = async (memberId, updatedName) => {
-    const trimmed = updatedName.trim();
-    if (!trimmed) return;
-
-    const targetMember = members.find((m) => m.id === memberId);
-    if (!targetMember) return;
-
-    // 名前が変わっていない場合は通信しない
-    if (targetMember.name === trimmed) return;
-
-    const payload = {
-      action: "saveMember",
-      payload: {
-        id: memberId,
-        name: trimmed,
-        items: targetMember.items || []
-      }
-    };
-
-    try {
-      const res = await fetch(GAS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify(payload)
-      });
-      const result = await res.json();
-      if (result.status !== "success") {
-        console.error("名前の保存に失敗しました");
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const deleteMember = async (memberId) => {
-    if (!confirm("このメンバーを削除しますか？")) return;
-    setLoading(true);
-    try {
-      const res = await fetch(GAS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({ action: "deleteMember", payload: { id: memberId } })
-      });
-      const result = await res.json();
-      if (result.status === "success") {
-        setMembers(members.filter((m) => m.id !== memberId));
-      }
-    } catch (e) {
-      console.error(e);
-      alert("削除に失敗しました");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const addItem = async (memberId) => {
-    const label = newItemLabels[memberId];
-    const target = Number(newItemTargets[memberId]);
-    const unit = newItemUnits[memberId] || "件";
-
-    if (!label || !target) {
-      alert("項目名と目標数値を入力してください");
-      return;
-    }
-
-    const targetMember = members.find((m) => m.id === memberId);
-    if (!targetMember) return;
-
-    const newItems = [
-      ...(targetMember.items || []),
-      { id: "item_" + Date.now(), label, target, unit }
-    ];
-
-    setLoading(true);
-    const payload = {
-      action: "saveMember",
-      payload: { id: targetMember.id, name: targetMember.name, items: newItems }
-    };
-
-    try {
-      const res = await fetch(GAS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify(payload)
-      });
-      const result = await res.json();
-      if (result.status === "success") {
-        setMembers(
-          members.map((m) => (m.id === memberId ? { ...m, items: newItems } : m))
-        );
-        setNewItemLabels({ ...newItemLabels, [memberId]: "" });
-        setNewItemTargets({ ...newItemTargets, [memberId]: "" });
-      }
-    } catch (e) {
-      console.error(e);
-      alert("項目の追加に失敗しました");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const removeItem = async (memberId, itemId) => {
-    const targetMember = members.find((m) => m.id === memberId);
-    if (!targetMember) return;
-
-    const newItems = (targetMember.items || []).filter((it) => it.id !== itemId);
-
-    setLoading(true);
-    const payload = {
-      action: "saveMember",
-      payload: { id: targetMember.id, name: targetMember.name, items: newItems }
-    };
-
-    try {
-      const res = await fetch(GAS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify(payload)
-      });
-      const result = await res.json();
-      if (result.status === "success") {
-        setMembers(
-          members.map((m) => (m.id === memberId ? { ...m, items: newItems } : m))
-        );
-      }
-    } catch (e) {
-      console.error(e);
-      alert("項目の削除に失敗しました");
-    } finally {
-      setLoading(false);
-    }
+  const updateMember = (id, patch) => {
+    setMembers(members.map((m) => (m.id === id ? { ...m, ...patch } : m)));
   };
 
   return (
-    <div className="pt-5 space-y-5">
-      <div className="text-xs text-[#8B949E] leading-relaxed bg-[#161B22] border border-[#30363D] rounded-xl p-3.5">
-        メンバーごとに追う目標項目（KPI）を登録します。データは全員共通で更新されます[cite: 3]。
-      </div>
+    <div className="pt-6 space-y-5">
+      <p className="text-xs text-[#8B949E] leading-relaxed">
+        メンバーごとに追う目標項目（KPI）を登録します。データは全員共通で更新されます。
+      </p>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2.5">
         <input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
-          placeholder="メンバー名（例: 田中さん）"
-          className="flex-1 bg-[#161B22] border border-[#30363D] rounded-xl px-3.5 py-2.5 text-xs text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
+          onKeyDown={(e) => e.key === "Enter" && addMember()}
+          placeholder="メンバー名（例：田中さん）"
+          className="flex-1 bg-[#161B22] border border-[#30363D] rounded-xl px-3.5 py-2.5 text-sm text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B] focus:ring-1 focus:ring-[#F2B04B] transition-all"
         />
         <button
           onClick={addMember}
-          disabled={loading}
-          className="bg-[#F2B04B] hover:bg-[#E8A33D] text-[#0D1117] font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1 shrink-0 active:scale-95 transition-all shadow-sm"
+          className="bg-[#F2B04B] hover:bg-[#E8A33D] text-[#0D1117] rounded-xl px-4 flex items-center gap-1 font-bold text-sm active:scale-95 transition-all shadow-sm"
         >
-          <Plus size={15} strokeWidth={2.5} />
+          <Plus size={16} strokeWidth={2.5} />
           追加
         </button>
       </div>
 
       <div className="space-y-3">
-        {members.map((m) => {
-          const isOpen = openMemberId === m.id;
-          const items = m.items || [];
-
-          return (
-            <div
-              key={m.id}
-              className="bg-[#161B22] border border-[#30363D] rounded-xl overflow-hidden shadow-sm transition-all"
-            >
-              <div
-                onClick={() => setOpenMemberId(isOpen ? null : m.id)}
-                className="p-4 flex items-center justify-between cursor-pointer hover:bg-[#21262D]/50"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-[#F2B04B]/10 border border-[#F2B04B]/30 text-[#F2B04B] flex items-center justify-center font-bold text-xs">
-                    {m.name ? m.name.slice(0, 1) : "?"}
-                  </div>
-                  <div>
-                    {/* 名前編集用インプット */}
-                    <input
-                      type="text"
-                      value={m.name}
-                      onClick={(e) => e.stopPropagation()} // アコーディオンの開閉を防ぐ
-                      onChange={(e) => {
-                        const updated = e.target.value;
-                        setMembers(
-                          members.map((mem) =>
-                            mem.id === m.id ? { ...mem, name: updated } : mem
-                          )
-                        );
-                      }}
-                      onBlur={(e) => saveMemberName(m.id, e.target.value)}
-                      className="bg-transparent font-bold text-xs text-[#F0F6FC] focus:outline-none focus:border-b focus:border-[#F2B04B] w-32"
-                    />
-                    <div className="text-[11px] text-[#8B949E] mt-0.5">
-                      目標項目：{items.length}件[cite: 3]
-                    </div>
-                  </div>
-                </div>
-                <div className="text-[#8B949E]">
-                  {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </div>
-              </div>
-
-              {isOpen && (
-                <div className="px-4 pb-4 pt-1 border-t border-[#30363D] space-y-3 bg-[#0D1117]/40">
-                  <div className="space-y-2 pt-2">
-                    {items.map((it) => (
-                      <div
-                        key={it.id}
-                        className="bg-[#161B22] border border-[#30363D] rounded-lg px-3 py-2.5 flex items-center justify-between text-xs"
-                      >
-                        <span className="font-semibold text-[#F0F6FC]">
-                          {it.label}{" "}
-                          <span className="text-[#8B949E] font-normal ml-1">
-                            (目標: {it.target}{it.unit}/月)
-                          </span>
-                        </span>
-                        <button
-                          onClick={() => removeItem(m.id, it.id)}
-                          className="text-[#6E7681] hover:text-[#FF8585] p-1 transition-colors"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-3 space-y-2.5">
-                    <div className="text-[11px] font-bold text-[#8B949E]">新しい目標項目を追加</div>
-                    <div className="flex gap-2">
-                      <input
-                        value={newItemLabels[m.id] || ""}
-                        onChange={(e) =>
-                          setNewItemLabels({ ...newItemLabels, [m.id]: e.target.value })
-                        }
-                        placeholder="項目名（例: 紹介数）[cite: 3]"
-                        className="flex-1 bg-[#0D1117] border border-[#30363D] rounded-lg px-2.5 py-1.5 text-xs text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
-                      />
-                      <input
-                        value={newItemTargets[m.id] || ""}
-                        onChange={(e) =>
-                          setNewItemTargets({
-                            ...newItemTargets,
-                            [m.id]: e.target.value.replace(/[^0-9]/g, ""),
-                          })
-                        }
-                        inputMode="numeric"
-                        placeholder="目標[cite: 3]"
-                        className="w-14 bg-[#0D1117] border border-[#30363D] rounded-lg px-2.5 py-1.5 text-xs text-center text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
-                      />
-                      <select
-                        value={newItemUnits[m.id] || "件"}
-                        onChange={(e) =>
-                          setNewItemUnits({ ...newItemUnits, [m.id]: e.target.value })
-                        }
-                        className="w-16 bg-[#0D1117] border border-[#30363D] rounded-lg px-2 py-1.5 text-xs text-[#F0F6FC] focus:outline-none focus:border-[#F2B04B]"
-                      >
-                        <option value="件">件</option>
-                        <option value="万円">万円</option>
-                        <option value="回">回</option>
-                        <option value="人">人</option>
-                        <option value="本">本</option>
-                      </select>
-                      <button
-                        onClick={() => addItem(m.id)}
-                        className="bg-[#21262D] hover:bg-[#30363D] border border-[#30363D] text-[#F2B04B] p-2 rounded-lg shrink-0 flex items-center justify-center transition-all"
-                      >
-                        <Plus size={15} strokeWidth={2.5} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="pt-1 text-right">
-                    <button
-                      onClick={() => deleteMember(m.id)}
-                      className="text-[11px] text-[#FF8585] hover:underline flex items-center gap-1 ml-auto font-medium"
-                    >
-                      <Trash2 size={12} />
-                      このメンバーを削除[cite: 3]
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {members.map((m) => (
+          <MemberCard
+            key={m.id}
+            member={m}
+            expanded={expandedId === m.id}
+            onToggle={() => setExpandedId(expandedId === m.id ? null : m.id)}
+            onRemove={() => removeMember(m.id)}
+            onUpdate={(patch) => updateMember(m.id, patch)}
+          />
+        ))}
+        {members.length === 0 && (
+          <div className="text-center py-12 text-[#6E7681] text-xs">
+            まだメンバーが登録されていません
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function MemberCard({ member, expanded, onToggle, onRemove, onUpdate }) {
+  const [label, setLabel] = useState("");
+  const [target, setTarget] = useState("");
+  const [unit, setUnit] = useState("件");
+
+  const addItem = () => {
+    if (!label.trim() || !target) return;
+    const item = { id: uid(), label: label.trim(), target: Number(target), unit };
+    onUpdate({ items: [...(member.items || []), item] });
+    setLabel("");
+    setTarget("");
+  };
+
+  const removeItem = (id) => {
+    onUpdate({ items: (member.items || []).filter((it) => it.id !== id) });
+  };
+
+  return (
+    <div className="bg-[#161B22] border border-[#30363D] rounded-xl overflow-hidden shadow-sm hover:border-[#484F58] transition-all">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-4.5 py-4 text-left"
+      >
+        <div className="flex items-center gap-3.5">
+          <div className="w-9 h-9 rounded-full bg-[#21262D] border border-[#30363D] flex items-center justify-center text-xs font-bold text-[#F2B04B]">
+            {member.name.slice(0, 1)}
+          </div>
+          <div>
+            <div className="font-semibold text-sm text-[#F0F6FC]">{member.name}</div>
+            <div className="text-[11px] text-[#8B949E] mt-0.5">
+              目標項目：{(member.items || []).length}件
+            </div>
+          </div>
+        </div>
+        <ChevronRight
+          size={18}
+          className={`text-[#6E7681] transition-transform duration-200 ${expanded ? "rotate-90 text-[#F2B04B]" : ""}`}
+        />
+      </button>
+
+      {expanded && (
+        <div className="px-4.5 pb-4 border-t border-[#30363D]/60 pt-3.5 space-y-3 bg-[#0D1117]/40">
+          {(member.items || []).map((it) => (
+            <div
+              key={it.id}
+              className="flex items-center justify-between bg-[#21262D] border border-[#30363D] rounded-lg px-3 py-2 text-xs"
+            >
+              <span className="font-medium text-[#C9D1D9]">
+                {it.label}{" "}
+                <span className="text-[#8B949E] ml-1 font-normal">
+                  (目標: {it.target}{it.unit}/週)
+                </span>
+              </span>
+              <button onClick={() => removeItem(it.id)} className="p-1 text-[#8B949E] hover:text-[#FF8585] transition-colors">
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+
+          <div className="w-full overflow-x-auto pt-1 pb-1 scrollbar-none">
+            <div className="grid grid-cols-[1fr_75px_60px_36px] gap-2 items-center min-w-[340px]">
+              <input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="項目名（例：紹介数）"
+                className="bg-[#21262D] border border-[#30363D] rounded-lg px-2.5 py-2 text-xs placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
+              />
+              <input
+                value={target}
+                onChange={(e) => setTarget(e.target.value.replace(/[^0-9.]/g, ""))}
+                placeholder="目標"
+                inputMode="decimal"
+                className="bg-[#21262D] border border-[#30363D] rounded-lg px-2.5 py-2 text-xs text-center placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
+              />
+              <input
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                className="bg-[#21262D] border border-[#30363D] rounded-lg px-2.5 py-2 text-xs text-center focus:outline-none focus:border-[#F2B04B]"
+              />
+              <button
+                onClick={addItem}
+                className="bg-[#30363D] hover:bg-[#484F58] border border-[#484F58] rounded-lg h-full flex items-center justify-center active:scale-95 transition-all"
+              >
+                <Plus size={15} className="text-[#F2B04B]" />
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-2 flex justify-end">
+            <button
+              onClick={onRemove}
+              className="text-[11px] text-[#FF8585] hover:underline flex items-center gap-1 opacity-80 hover:opacity-100 transition-opacity"
+            >
+              <Trash2 size={12} /> このメンバーを削除
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
