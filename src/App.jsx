@@ -804,10 +804,23 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
   records.forEach((r) => {
     if (!r.week) return;
 
-    const match = r.week.match(/(\d{1,2})[\/\-月]/);
-    const monthKey = match ? `${match[1]}月` : r.week;
-    
-    monthlyMap[monthKey] = r.achievementRate;
+    // "9/28週" や "9/28" などの表記から「月」と「日」を取得
+    const match = r.week.match(/(\d{1,2})[\/\-月](\d{1,2})?/);
+
+    if (match) {
+      let month = parseInt(match[1], 10);
+      const day = match[2] ? parseInt(match[2], 10) : null;
+
+      // 9/28以降の週は10月の達成率として判定・集計する
+      if (month === 9 && day && day >= 28) {
+        month = 10;
+      }
+
+      const monthKey = `${month}月`;
+      monthlyMap[monthKey] = r.achievementRate;
+    } else {
+      monthlyMap[r.week] = r.achievementRate;
+    }
   });
 
   const monthlyChartData = Object.keys(monthlyMap).map((key) => ({
