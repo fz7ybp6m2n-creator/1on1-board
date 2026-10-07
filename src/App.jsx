@@ -409,14 +409,78 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
     );
   }
 
-  const avgRate = (member?.items || []).length
-    ? Math.round(
-        member.items.reduce((sum, it) => {
-          const actual = Number(achievements[it.id]?.actual ?? 0);
-          return sum + Math.min(100, (actual / it.target) * 100 || 0);
-        }, 0) / member.items.length
-      )
-    : 0;
+// 週モードか月モード（累計）かで計算を切り替える
+  let avgRate = 0;
+  const currentItems = member?.items || [];
+
+  if (viewMode === "week") {
+    // 週の達成率モード：現在の週のデータで計算
+    avgRate = currentItems.length
+      ? Math.round(
+          currentItems.reduce((sum, it) => {
+            const actual = Number(achievements[it.id]?.actual ?? 0);
+            return sum + Math.min(100, (actual / it.target) * 100 || 0);
+          }, 0) / currentItems.length
+        )
+      : 0;
+  } else {
+    // 月の達成率（累計）モード：対象週の「月」に属する全データの平均を計算
+    // ※9/28週以降は10月として扱うルールを適用
+    const match = week ? week.match(/(\d{1,2})[\/\-月](\d{1,2})?/ ) : null;
+    let targetMonth = match ? parseInt(match[1], 10) : null;
+    const targetDay = match && match[2] ? parseInt(match[2], 10) : null;
+
+    if (targetMonth === 9 && targetDay && targetDay >= 28) {
+      targetMonth = 10;
+    }
+
+    // メンバーの持つ全レコード（または該当する月の全履歴）から、同じ月の週の達成率を抽出して平均を出す
+    // （※過去の保存済みデータや現在の実績データを含めた月平均の算出）
+    const allRecords = member?.records || []; // 過去の記録データ配列
+    
+    // もし records がグローバルに管理されている場合は、以下のように全レコードから算出することも可能です
+    // ここでは現在のデータの月内平均を出すために、該当月のデータを集計します
+    
+    // 代替として、現在の入力値（achievements）をベースにしつつ、
+    // グラフ側と同じロジックで月平均を求めている変数があればそれを利用するか、
+    // 下記のように簡易的に月内の全週データから平均を計算します：
+    
+    let monthlyRates = [];
+    if (allRecords.length > 0) {
+      allRecords.forEach((r) => {
+        const mMatch = r.week ? r.week.match(/(\d{1,2})[\/\-月](\d{1,2})?/) : null;
+        if (mMatch) {
+          let m = parseInt(mMatch[1], 10);
+          let d = mMatch[2] ? parseInt(mMatch[2], 10) : null;
+          if (m === 9 && d && d >= 28) m = 10;
+          
+          if (m === targetMonth) {
+            monthlyRates.push(r.achievementRate);
+          }
+        }
+      });
+    }
+
+    // もし過去レコード配列がない・または今の入力中の週も含める場合
+    const currentRate = currentItems.length
+      ? Math.round(
+          currentItems.reduce((sum, it) => {
+            const actual = Number(achievements[it.id]?.actual ?? 0);
+            return sum + Math.min(100, (actual / it.target) * 100 || 0);
+          }, 0) / currentItems.length
+        )
+      : 0;
+
+    if (monthlyRates.length === 0) {
+      monthlyRates.push(currentRate);
+    } else {
+      // 現在入力中の値も混ぜる場合
+      monthlyRates.push(currentRate);
+    }
+
+    const sum = monthlyRates.reduce((acc, curr) => acc + curr, 0);
+    avgRate = Math.round(sum / monthlyRates.length);
+  }
 
   const save = async () => {
     setLoadingRecord(true);
