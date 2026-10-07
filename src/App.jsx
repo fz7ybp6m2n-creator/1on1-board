@@ -691,19 +691,28 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <input
-                      value={actual}
-                      onChange={(e) =>
-                        setAchievements({
-                          ...achievements,
-                          [it.id]: { actual: e.target.value.replace(/[^0-9.]/g, "") },
-                        })
-                      }
-                      inputMode="decimal"
-                      placeholder="0"
-                      className="w-16 bg-[#0D1117] border border-[#30363D] rounded-lg px-2 py-1.5 text-xs text-center font-bold text-[#F0F6FC] focus:outline-none focus:border-[#F2B04B]"
-                    />
-                    <span className="text-xs text-[#8B949E] shrink-0">{it.unit}</span>
+                    {viewMode === "week" ? (
+                      <>
+                        <input
+                          value={actual}
+                          onChange={(e) =>
+                            setAchievements({
+                              ...achievements,
+                              [it.id]: { actual: e.target.value.replace(/[^0-9.]/g, "") },
+                            })
+                          }
+                          inputMode="decimal"
+                          placeholder="0"
+                          className="w-16 bg-[#0D1117] border border-[#30363D] rounded-lg px-2 py-1.5 text-xs text-center font-bold text-[#F0F6FC] focus:outline-none focus:border-[#F2B04B]"
+                        />
+                        <span className="text-xs text-[#8B949E] shrink-0">{it.unit}</span>
+                      </>
+                    ) : (
+                      <div className="text-xs font-semibold text-[#F2B04B] shrink-0 min-w-[70px]">
+                        累計: {monthlyTotals[it.id] || 0} {it.unit}
+                      </div>
+                    )}
+
                     <div className="flex-1 h-2 bg-[#21262D] rounded-full overflow-hidden border border-[#30363D]/40">
                       <div
                         className="h-full bg-[#F2B04B] transition-all duration-300"
