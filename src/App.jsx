@@ -153,9 +153,12 @@ function BottomNav({ tab, setTab }) {
       </div>
     </div>
   );
-}
+}import React, { useState } from "react";
+// アイコンが未定義でクラッシュするのを防ぐためインポートを追加
+import { Plus, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+
 // ================= MEMBER SETTING TAB =================
-function MemberSettingTab({ members, setMembers, GAS_API_URL }) {
+export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
   const [newName, setNewName] = useState("");
   const [openMemberId, setOpenMemberId] = useState(members[0]?.id || null);
   const [newItemLabels, setNewItemLabels] = useState({});
@@ -193,14 +196,11 @@ function MemberSettingTab({ members, setMembers, GAS_API_URL }) {
 
   // メンバー名保存処理（GASへ変更を反映）
   const saveMemberName = async (memberId, updatedName) => {
-    const trimmed = updatedName.trim();
+    const trimmed = updatedName?.trim() || "";
     if (!trimmed) return;
 
     const targetMember = members.find((m) => m.id === memberId);
-    if (!targetMember) return;
-
-    // 名前が変わっていない場合は通信しない
-    if (targetMember.name === trimmed) return;
+    if (!targetMember || targetMember.name === trimmed) return;
 
     const payload = {
       action: "saveMember",
@@ -268,7 +268,7 @@ function MemberSettingTab({ members, setMembers, GAS_API_URL }) {
     setLoading(true);
     const payload = {
       action: "saveMember",
-      payload: { id: targetMember.id, name: targetMember.name, items: newItems }
+      payload: { id: targetMember.id, name: targetMember.name || "", items: newItems }
     };
 
     try {
@@ -302,7 +302,7 @@ function MemberSettingTab({ members, setMembers, GAS_API_URL }) {
     setLoading(true);
     const payload = {
       action: "saveMember",
-      payload: { id: targetMember.id, name: targetMember.name, items: newItems }
+      payload: { id: targetMember.id, name: targetMember.name || "", items: newItems }
     };
 
     try {
@@ -349,7 +349,7 @@ function MemberSettingTab({ members, setMembers, GAS_API_URL }) {
       </div>
 
       <div className="space-y-3">
-        {members.map((m) => {
+        {(members || []).map((m) => {
           const isOpen = openMemberId === m.id;
           const items = m.items || [];
 
@@ -370,8 +370,8 @@ function MemberSettingTab({ members, setMembers, GAS_API_URL }) {
                     {/* 名前編集用インプット */}
                     <input
                       type="text"
-                      value={m.name}
-                      onClick={(e) => e.stopPropagation()} // アコーディオンの開閉を防ぐ
+                      value={m.name || ""}
+                      onClick={(e) => e.stopPropagation()}
                       onChange={(e) => {
                         const updated = e.target.value;
                         setMembers(
