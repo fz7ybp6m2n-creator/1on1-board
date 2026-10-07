@@ -154,7 +154,6 @@ function BottomNav({ tab, setTab }) {
     </div>
   );
 }
-
 // ================= MEMBER SETTING TAB =================
 function MemberSettingTab({ members, setMembers, GAS_API_URL }) {
   const [newName, setNewName] = useState("");
@@ -192,16 +191,26 @@ function MemberSettingTab({ members, setMembers, GAS_API_URL }) {
     }
   };
 
-  // メンバー名変更時の処理（フォーカスが外れた時や入力時に保存）
-  const updateMemberName = async (memberId, updatedName) => {
-    if (!updatedName.trim()) return;
-    const targetMember = members.find(m => m.id === memberId);
-    if (!targetMember || targetMember.name === updatedName) return;
+  // メンバー名保存処理（GASへ変更を反映）
+  const saveMemberName = async (memberId, updatedName) => {
+    const trimmed = updatedName.trim();
+    if (!trimmed) return;
+
+    const targetMember = members.find((m) => m.id === memberId);
+    if (!targetMember) return;
+
+    // 名前が変わっていない場合は通信しない
+    if (targetMember.name === trimmed) return;
 
     const payload = {
       action: "saveMember",
-      payload: { id: memberId, name: updatedName.trim(), items: targetMember.items || [] }
+      payload: {
+        id: memberId,
+        name: trimmed,
+        items: targetMember.items || []
+      }
     };
+
     try {
       const res = await fetch(GAS_API_URL, {
         method: "POST",
@@ -209,8 +218,8 @@ function MemberSettingTab({ members, setMembers, GAS_API_URL }) {
         body: JSON.stringify(payload)
       });
       const result = await res.json();
-      if (result.status === "success") {
-        setMembers(members.map(m => m.id === memberId ? { ...m, name: updatedName.trim() } : m));
+      if (result.status !== "success") {
+        console.error("名前の保存に失敗しました");
       }
     } catch (e) {
       console.error(e);
@@ -355,19 +364,23 @@ function MemberSettingTab({ members, setMembers, GAS_API_URL }) {
               >
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-[#F2B04B]/10 border border-[#F2B04B]/30 text-[#F2B04B] flex items-center justify-center font-bold text-xs">
-                    {m.name.slice(0, 1)}
+                    {m.name ? m.name.slice(0, 1) : "?"}
                   </div>
                   <div>
-                    {/* 名前を直接編集できるように修正 */}
+                    {/* 名前編集用インプット */}
                     <input
                       type="text"
                       value={m.name}
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()} // アコーディオンの開閉を防ぐ
                       onChange={(e) => {
                         const updated = e.target.value;
-                        setMembers(members.map(mem => mem.id === m.id ? { ...mem, name: updated } : mem));
+                        setMembers(
+                          members.map((mem) =>
+                            mem.id === m.id ? { ...mem, name: updated } : mem
+                          )
+                        );
                       }}
-                      onBlur={(e) => updateMemberName(m.id, e.target.value)}
+                      onBlur={(e) => saveMemberName(m.id, e.target.value)}
                       className="bg-transparent font-bold text-xs text-[#F0F6FC] focus:outline-none focus:border-b focus:border-[#F2B04B] w-32"
                     />
                     <div className="text-[11px] text-[#8B949E] mt-0.5">
