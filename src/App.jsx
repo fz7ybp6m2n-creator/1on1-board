@@ -800,27 +800,47 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
   }));
 
   // 月別データ（月ごとの最終レコードを集計）
-  const monthlyMap = {};
-  records.forEach((r) => {
-    if (!r.week) return;
+// 月ごとに達成率の配列を保持するオブジェクト
+  const monthlyRatesMap = {};
 
-    // "9/28週" や "9/28" などの表記から「月」と「日」を取得
+  records.forEach((r) => {
+    if (!r.week || r.achievementRate === undefined || r.achievementRate === null) return;
+
+    // "9/28週" や "10/5週" などから「月」と「日」を判別
     const match = r.week.match(/(\d{1,2})[\/\-月](\d{1,2})?/);
 
     if (match) {
       let month = parseInt(match[1], 10);
       const day = match[2] ? parseInt(match[2], 10) : null;
 
-      // 9/28以降の週は10月の達成率として判定・集計する
+      // 9/28以降の週は10月として判定する
       if (month === 9 && day && day >= 28) {
         month = 10;
       }
 
       const monthKey = `${month}月`;
-      monthlyMap[monthKey] = r.achievementRate;
+      if (!monthlyRatesMap[monthKey]) {
+        monthlyRatesMap[monthKey] = [];
+      }
+      monthlyRatesMap[monthKey].push(Number(r.achievementRate));
     } else {
-      monthlyMap[r.week] = r.achievementRate;
+      if (!monthlyRatesMap[r.week]) {
+        monthlyRatesMap[r.week] = [];
+      }
+      monthlyRatesMap[r.week].push(Number(r.achievementRate));
     }
+  });
+
+  // 各月の全週の平均達成率（四捨五入）を計算
+  const monthlyChartData = Object.keys(monthlyRatesMap).map((key) => {
+    const rates = monthlyRatesMap[key];
+    const sum = rates.reduce((acc, curr) => acc + curr, 0);
+    const avg = rates.length > 0 ? Math.round(sum / rates.length) : 0;
+
+    return {
+      label: key,
+      rate: avg
+    };
   });
 
   const monthlyChartData = Object.keys(monthlyMap).map((key) => ({
