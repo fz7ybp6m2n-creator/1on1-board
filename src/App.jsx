@@ -801,6 +801,7 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
 
   // 月別データ（月ごとの最終レコードを集計）
 // 月ごとに達成率の配列を保持するオブジェクト
+// 月ごとに達成率の配列を保持するオブジェクト
   const monthlyRatesMap = {};
 
   records.forEach((r) => {
@@ -842,11 +843,6 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
       rate: avg
     };
   });
-
-  const monthlyChartData = Object.keys(monthlyMap).map((key) => ({
-    label: key,
-    rate: monthlyMap[key]
-  }));
 
   // ボタンで選択されているモード（週 / 月）に応じてグラフデータを自動切り替え
   const chartData = historyViewMode === "week" ? weeklyChartData : monthlyChartData;
