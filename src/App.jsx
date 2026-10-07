@@ -2,28 +2,14 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   Plus,
   Trash2,
-  ChevronRight,
   ChevronUp,
   ChevronDown,
   Users,
   ClipboardList,
   TrendingUp,
-  Save,
-  X,
   Target,
-  Calendar,
   AlertCircle
 } from "lucide-react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine
-} from "recharts";
 
 const GAS_API_URL =
   "https://script.google.com/macros/s/AKfycbxsLMkvdwgKjjhEiqbLYON7IwTeqsPGwfRMCD6B3ooiM01FvVyhkHMbCEVjheR7Pe-0Gw/exec";
@@ -34,6 +20,16 @@ const NAV_ITEMS = [
   { id: "history", label: "達成率推移", icon: TrendingUp },
 ];
 
+export function currentWeekLabel() {
+  const d = new Date();
+  const day = d.getDay();
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - ((day + 6) % 7));
+  const m = monday.getMonth() + 1;
+  const dt = monday.getDate();
+  return `${m}/${dt}週`;
+}
+
 export default function OneOnOneBoard() {
   const [tab, setTab] = useState("members");
   const [members, setMembers] = useState([]);
@@ -41,7 +37,7 @@ export default function OneOnOneBoard() {
   const [selectedMemberId, setSelectedMemberId] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // itemsが文字列で戻ってきた場合に配列化するヘルパー
+  // itemsがJSON文字列で戻ってきた場合に配列化するヘルパー
   const parseMemberItems = (data) => {
     if (!Array.isArray(data)) return [];
     return data.map((m) => {
@@ -82,30 +78,6 @@ export default function OneOnOneBoard() {
     fetchMembers();
   }, []);
 
-  const persistMembers = useCallback(async (next) => {
-    setMembers(next);
-    setErrorMessage("");
-    try {
-      for (const m of next) {
-        await fetch(GAS_API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({
-            action: "saveMember",
-            payload: {
-              id: m.id,
-              name: m.name,
-              items: JSON.stringify(m.items || [])
-            }
-          })
-        });
-      }
-    } catch (e) {
-      console.error(e);
-      setErrorMessage("メンバー情報の保存に失敗しました。");
-    }
-  }, []);
-
   if (loading && members.length === 0) {
     return (
       <div className="min-h-screen bg-[#0D1117] flex items-center justify-center text-[#F0F6FC] font-sans text-sm tracking-wide">
@@ -127,7 +99,7 @@ export default function OneOnOneBoard() {
         {tab === "members" && (
           <MemberSettingTab
             members={members}
-            setMembers={persistMembers}
+            setMembers={setMembers}
             GAS_API_URL={GAS_API_URL}
           />
         )}
@@ -285,7 +257,7 @@ export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
 
   const addItem = async (memberId) => {
     const label = newItemLabels[memberId];
-    const target = Number(newItemTargets[memberId]);
+    const target = Number(newItemTargets[memberId]) || 0;
     const unit = newItemUnits[memberId] || "件";
 
     if (!label || !target) {
@@ -385,7 +357,7 @@ export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
         <button
           onClick={addMember}
           disabled={loading}
-          className="bg-[#F2B04B] hover:bg-[#E8A33D] text-[#0D1117] font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1 shrink-0 active:scale-95 transition-all shadow-sm"
+          className="bg-[#F2B04B] hover:bg-[#E8A33D] text-[#0D1117] font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1 shrink-0 active:scale-95 transition-all shadow-sm disabled:opacity-50"
         >
           <Plus size={15} strokeWidth={2.5} />
           追加
@@ -507,7 +479,8 @@ export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
                       </select>
                       <button
                         onClick={() => addItem(m.id)}
-                        className="bg-[#21262D] hover:bg-[#30363D] border border-[#30363D] text-[#F2B04B] p-2 rounded-lg shrink-0 flex items-center justify-center transition-all"
+                        disabled={loading}
+                        className="bg-[#21262D] hover:bg-[#30363D] border border-[#30363D] text-[#F2B04B] p-2 rounded-lg shrink-0 flex items-center justify-center transition-all disabled:opacity-50"
                       >
                         <Plus size={15} strokeWidth={2.5} />
                       </button>
@@ -533,7 +506,7 @@ export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
   );
 }
 
-// 他のタブが未定義によるクラッシュを防ぐフォールバック用コンポーネント
+// 他タブのダミーコンポーネント
 function SheetTab() {
   return <div className="pt-5 text-xs text-[#8B949E]">1on1シートタブのコンテンツ</div>;
 }
@@ -541,7 +514,6 @@ function SheetTab() {
 function HistoryTab() {
   return <div className="pt-5 text-xs text-[#8B949E]">達成率推移タブのコンテンツ</div>;
 }
-
 // ================= SHEET TAB =================
 function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
   const [week, setWeek] = useState(currentWeekLabel());
