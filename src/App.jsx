@@ -408,12 +408,12 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
       </div>
     );
   }
-
+}
 let avgRate = 0;
   const currentItems = member?.items || [];
 
   if (viewMode === "week") {
-    // 週の達成率モード：現在の週のデータで計算
+    // 【週の達成率モード】現在入力中の達成率
     avgRate = currentItems.length
       ? Math.round(
           currentItems.reduce((sum, it) => {
@@ -423,7 +423,7 @@ let avgRate = 0;
         )
       : 0;
   } else {
-    // 月の達成率（累計）モード：対象週の「月」に属する全データの平均を計算
+    // 【月の達成率モード】対象週が属する月の全データ（履歴＋入力中）から平均を算出
     const match = week ? week.match(/(\d{1,2})[\/\-月](\d{1,2})?/) : null;
     let targetMonth = match ? parseInt(match[1], 10) : null;
     const targetDay = match && match[2] ? parseInt(match[2], 10) : null;
@@ -432,12 +432,11 @@ let avgRate = 0;
       targetMonth = 10;
     }
 
-    // アプリ全体で保持している `records` から、選択中メンバーかつ対象月のデータを抽出
+    // 選択中メンバーの過去レコードを抽出（名前またはIDで一致）
     const monthlyRates = [];
     (records || []).forEach((r) => {
-      // 選択中のメンバーのデータのみに絞り込む（メンバーIDのプロパティ名に合わせて調整してください）
-      if (r.memberId && r.memberId !== selectedMemberId) return;
-      if (!r.week || r.achievementRate === undefined) return;
+      const isTargetMember = (r.memberId && r.memberId === member?.id) || (r.name && r.name === member?.name);
+      if (!isTargetMember || !r.week || r.achievementRate === undefined) return;
 
       const rMatch = r.week.match(/(\d{1,2})[\/\-月](\d{1,2})?/);
       if (rMatch) {
@@ -451,7 +450,7 @@ let avgRate = 0;
       }
     });
 
-    // 履歴データがない場合や現在の入力中データを反映させるためのフォールバック
+    // 現在画面で入力中の今週の達成率
     const currentRate = currentItems.length
       ? Math.round(
           currentItems.reduce((sum, it) => {
@@ -461,35 +460,13 @@ let avgRate = 0;
         )
       : 0;
 
-    // 現在入力中のデータがまだ records に保存されていない場合も考慮して追加
-    // （もし重複が気になる場合は調整可能ですが、まずはこれで平均値が算出されます）
+    // 履歴データがない場合は今週の達成率を使用し、データがある場合は合算して平均を算出
     if (monthlyRates.length === 0) {
-      monthlyRates.push(currentRate);
-    }
-
-    const sum = monthlyRates.reduce((acc, curr) => acc + curr, 0);
-    avgRate = monthlyRates.length > 0 ? Math.round(sum / monthlyRates.length) : currentRate;
-  }
-
-    // もし過去レコード配列がない・または今の入力中の週も含める場合
-    const currentRate = currentItems.length
-      ? Math.round(
-          currentItems.reduce((sum, it) => {
-            const actual = Number(achievements[it.id]?.actual ?? 0);
-            return sum + Math.min(100, (actual / it.target) * 100 || 0);
-          }, 0) / currentItems.length
-        )
-      : 0;
-
-    if (monthlyRates.length === 0) {
-      monthlyRates.push(currentRate);
+      avgRate = currentRate;
     } else {
-      // 現在入力中の値も混ぜる場合
-      monthlyRates.push(currentRate);
+      const sum = monthlyRates.reduce((acc, curr) => acc + curr, 0);
+      avgRate = Math.round(sum / monthlyRates.length);
     }
-
-    const sum = monthlyRates.reduce((acc, curr) => acc + curr, 0);
-    avgRate = Math.round(sum / monthlyRates.length);
   }
 
   const save = async () => {
