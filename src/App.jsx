@@ -252,26 +252,36 @@ function MemberCard({ member, expanded, onToggle, onRemove, onUpdate }) {
 
   return (
     <div className="bg-[#161B22] border border-[#30363D] rounded-xl overflow-hidden shadow-sm hover:border-[#484F58] transition-all">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-4.5 py-4 text-left"
-      >
-        <div className="flex items-center gap-3.5">
-          <div className="w-9 h-9 rounded-full bg-[#21262D] border border-[#30363D] flex items-center justify-center text-xs font-bold text-[#F2B04B]">
-            {member.name.slice(0, 1)}
+      <div className="w-full flex items-center justify-between px-4.5 py-3.5">
+        <div className="flex items-center gap-3 flex-1 mr-2">
+          <div className="w-9 h-9 rounded-full bg-[#21262D] border border-[#30363D] flex items-center justify-center text-xs font-bold text-[#F2B04B] shrink-0">
+            {member.name ? member.name.slice(0, 1) : "？"}
           </div>
-          <div>
-            <div className="font-semibold text-sm text-[#F0F6FC]">{member.name}</div>
-            <div className="text-[11px] text-[#8B949E] mt-0.5">
+          <div className="flex-1">
+            {/* 名前を直接編集できるようにinput化 */}
+            <input
+              type="text"
+              value={member.name}
+              onChange={(e) => onUpdate({ name: e.target.value })}
+              placeholder="メンバー名"
+              className="bg-[#0D1117] border border-[#30363D] rounded-lg px-2.5 py-1 text-sm font-semibold text-[#F0F6FC] focus:outline-none focus:border-[#F2B04B] w-full max-w-[180px]"
+            />
+            <div className="text-[11px] text-[#8B949E] mt-0.5 pl-0.5">
               目標項目：{(member.items || []).length}件
             </div>
           </div>
         </div>
-        <ChevronRight
-          size={18}
-          className={`text-[#6E7681] transition-transform duration-200 ${expanded ? "rotate-90 text-[#F2B04B]" : ""}`}
-        />
-      </button>
+
+        <button
+          onClick={onToggle}
+          className="p-2 hover:bg-[#21262D] rounded-lg transition-colors"
+        >
+          <ChevronRight
+            size={18}
+            className={`text-[#6E7681] transition-transform duration-200 ${expanded ? "rotate-90 text-[#F2B04B]" : ""}`}
+          />
+        </button>
+      </div>
 
       {expanded && (
         <div className="px-4.5 pb-4 border-t border-[#30363D]/60 pt-3.5 space-y-3 bg-[#0D1117]/40">
