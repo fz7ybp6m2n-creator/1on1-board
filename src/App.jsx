@@ -51,7 +51,6 @@ export default function OneOnOneBoard() {
     fetchMembers();
   }, []);
 
-  // ★ 削除命令も送れるように修正した保存関数
   const persistMembers = useCallback(async (next) => {
     setMembers(next);
     setErrorMessage("");
@@ -170,12 +169,8 @@ function MembersTab({ members, setMembers }) {
     setExpandedId(m.id);
   };
 
-  // ★ メンバー削除時にスプレッドシート（GAS）からも削除する処理を追加
   const removeMember = async (id) => {
-    // まず画面上のステートから消去
     setMembers(members.filter((m) => m.id !== id));
-
-    // GASへ削除リクエストを送信
     try {
       await fetch(GAS_API_URL, {
         method: "POST",
@@ -297,7 +292,6 @@ function MemberCard({ member, expanded, onToggle, onRemove, onUpdate }) {
             </div>
           ))}
 
-          {/* 横スクロール対応の入力要素 */}
           <div className="w-full overflow-x-auto pt-1 pb-1 scrollbar-none">
             <div className="grid grid-cols-[1fr_75px_60px_36px] gap-2 items-center min-w-[340px]">
               <input
@@ -352,6 +346,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
   const [prevPrevNotDone, setPrevPrevNotDone] = useState([]);
   const [saved, setSaved] = useState(false);
   const [loadingRecord, setLoadingRecord] = useState(false);
+  const [records, setRecords] = useState([]); // ★ 過去レコードを保持して月平均計算に利用
 
   const member = members.find((m) => m.id === selectedMemberId);
 
@@ -363,6 +358,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
       try {
         const res = await fetch(`${GAS_API_URL}?action=getRecords&memberId=${member.id}`);
         const allRecords = await res.json();
+        setRecords(allRecords || []); // ★ 取得した全レコードをステートに保存
         
         const currentRec = allRecords.find((r) => r.week === week);
         if (currentRec) {
@@ -408,12 +404,11 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
       </div>
     );
   }
-}
-let avgRate = 0;
+
+  let avgRate = 0;
   const currentItems = member?.items || [];
 
   if (viewMode === "week") {
-    // 【週の達成率モード】現在入力中の達成率
     avgRate = currentItems.length
       ? Math.round(
           currentItems.reduce((sum, it) => {
@@ -423,7 +418,6 @@ let avgRate = 0;
         )
       : 0;
   } else {
-    // 【月の達成率モード】対象週が属する月の全データ（履歴＋入力中）から平均を算出
     const match = week ? week.match(/(\d{1,2})[\/\-月](\d{1,2})?/) : null;
     let targetMonth = match ? parseInt(match[1], 10) : null;
     const targetDay = match && match[2] ? parseInt(match[2], 10) : null;
@@ -432,7 +426,6 @@ let avgRate = 0;
       targetMonth = 10;
     }
 
-    // 選択中メンバーの過去レコードを抽出（名前またはIDで一致）
     const monthlyRates = [];
     (records || []).forEach((r) => {
       const isTargetMember = (r.memberId && r.memberId === member?.id) || (r.name && r.name === member?.name);
@@ -450,7 +443,6 @@ let avgRate = 0;
       }
     });
 
-    // 現在画面で入力中の今週の達成率
     const currentRate = currentItems.length
       ? Math.round(
           currentItems.reduce((sum, it) => {
@@ -460,7 +452,6 @@ let avgRate = 0;
         )
       : 0;
 
-    // 履歴データがない場合は今週の達成率を使用し、データがある場合は合算して平均を算出
     if (monthlyRates.length === 0) {
       avgRate = currentRate;
     } else {
@@ -508,7 +499,6 @@ let avgRate = 0;
 
   return (
     <div className="pt-5 space-y-5">
-      {/* メンバー選択タブ */}
       <div className="flex gap-2 overflow-x-auto pb-1.5 -mx-4 px-4 scrollbar-none">
         {members.map((m) => (
           <button
@@ -524,7 +514,7 @@ let avgRate = 0;
           </button>
         ))}
       </div>
-      {/* 週指定入力 */}
+      
       <div className="flex items-center gap-2.5 bg-[#161B22] border border-[#30363D] rounded-xl px-3.5 py-2.5 text-xs text-[#C9D1D9]">
         <Calendar size={15} className="text-[#8B949E] shrink-0" />
         <span className="text-[#8B949E]">対象週:</span>
@@ -534,6 +524,7 @@ let avgRate = 0;
           className="bg-transparent flex-1 text-xs font-semibold text-[#F0F6FC] focus:outline-none"
         />
       </div>
+      
       <div className="flex bg-[#161B22] border border-[#30363D] p-1 rounded-xl gap-1">
         <button
           onClick={() => setViewMode("week")}
@@ -557,7 +548,6 @@ let avgRate = 0;
         </button>
       </div>
 
-
       {member && (!member.items || member.items.length === 0) && (
         <div className="text-xs text-[#8B949E] text-center py-10 bg-[#161B22]/50 border border-[#30363D] rounded-xl">
           {member.name}さんの目標項目が未登録です。「メンバー設定」で追加してください。
@@ -566,7 +556,6 @@ let avgRate = 0;
 
       {member && member.items && member.items.length > 0 && (
         <>
-          {/* 先週の実行確認 */}
           {executionChecks.length > 0 && (
             <div className="bg-[#161B22] border border-[#ED4245]/30 rounded-xl p-4 space-y-3 shadow-sm">
               <div className="text-[11px] font-bold text-[#FF8585] uppercase tracking-wider flex items-center gap-1.5">
@@ -631,7 +620,6 @@ let avgRate = 0;
             </div>
           )}
 
-          {/* 達成率サマリー */}
           <div className="bg-gradient-to-r from-[#161B22] to-[#21262D] border border-[#30363D] rounded-xl p-4.5 flex items-center justify-between shadow-sm">
             <div>
               <div className="text-[11px] font-bold text-[#8B949E] uppercase tracking-wider">
@@ -658,7 +646,6 @@ let avgRate = 0;
             </div>
           </div>
 
-          {/* KPI入力リスト */}
           <div className="space-y-3">
             {member.items.map((it) => {
               const actual = achievements[it.id]?.actual ?? "";
@@ -706,7 +693,6 @@ let avgRate = 0;
             })}
           </div>
 
-          {/* 振り返り・次週アクション */}
           <div className="space-y-4 pt-1">
             <div>
               <label className="text-xs font-bold text-[#C9D1D9] mb-1.5 block">
@@ -810,7 +796,7 @@ let avgRate = 0;
       )}
     </div>
   );
-
+}
 
 // ================= HISTORY TAB =================
 function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
@@ -844,28 +830,22 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
     );
   }
 
-  // 週別データ
   const weeklyChartData = records.map((r) => ({
     label: r.week,
     rate: r.achievementRate
   }));
 
-  // 月別データ（月ごとの最終レコードを集計）
-// 月ごとに達成率の配列を保持するオブジェクト
-// 月ごとに達成率の配列を保持するオブジェクト
   const monthlyRatesMap = {};
 
   records.forEach((r) => {
     if (!r.week || r.achievementRate === undefined || r.achievementRate === null) return;
 
-    // "9/28週" や "10/5週" などから「月」と「日」を判別
     const match = r.week.match(/(\d{1,2})[\/\-月](\d{1,2})?/);
 
     if (match) {
       let month = parseInt(match[1], 10);
       const day = match[2] ? parseInt(match[2], 10) : null;
 
-      // 9/28以降の週は10月として判定する
       if (month === 9 && day && day >= 28) {
         month = 10;
       }
@@ -883,7 +863,6 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
     }
   });
 
-  // 各月の全週の平均達成率（四捨五入）を計算
   const monthlyChartData = Object.keys(monthlyRatesMap).map((key) => {
     const rates = monthlyRatesMap[key];
     const sum = rates.reduce((acc, curr) => acc + curr, 0);
@@ -895,7 +874,6 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
     };
   });
 
-  // ボタンで選択されているモード（週 / 月）に応じてグラフデータを自動切り替え
   const chartData = historyViewMode === "week" ? weeklyChartData : monthlyChartData;
 
   return (
@@ -924,7 +902,6 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
         </div>
       ) : (
         <>
-          {/* 週 / 月 の切り替えボタン */}
           <div className="flex bg-[#161B22] border border-[#30363D] p-1 rounded-xl gap-1 mb-4">
             <button
               onClick={() => setHistoryViewMode("week")}
@@ -955,7 +932,6 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
             <ResponsiveContainer width="100%" height={190}>
               <LineChart data={chartData} margin={{ top: 8, right: 12, left: -24, bottom: 0 }}>
                 <CartesianGrid stroke="#30363D" strokeDasharray="3 3" vertical={false} />
-                {/* dataKey を label に変更 */}
                 <XAxis dataKey="label" tick={{ fill: "#8B949E", fontSize: 10 }} axisLine={{ stroke: "#30363D" }} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{ fill: "#8B949E", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <ReferenceLine y={70} stroke="#ED4245" strokeDasharray="4 4" />
@@ -964,7 +940,7 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
                   labelStyle={{ color: "#F2B04B", fontWeight: "bold" }}
                   formatter={(value) => [`${value}%`, "達成率"]}
                 />
-              <Line type="monotone" dataKey="rate" name="達成率" stroke="#F2B04B" strokeWidth={2.5} dot={{ r: 4, fill: "#F2B04B" }} />
+                <Line type="monotone" dataKey="rate" name="達成率" stroke="#F2B04B" strokeWidth={2.5} dot={{ r: 4, fill: "#F2B04B" }} />
               </LineChart>
             </ResponsiveContainer>
             <div className="text-[10px] text-[#8B949E] mt-2 flex items-center gap-1.5">
