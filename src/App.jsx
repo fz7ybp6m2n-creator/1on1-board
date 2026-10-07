@@ -346,7 +346,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
   const [prevPrevNotDone, setPrevPrevNotDone] = useState([]);
   const [saved, setSaved] = useState(false);
   const [loadingRecord, setLoadingRecord] = useState(false);
-  const [records, setRecords] = useState([]); // ★ 過去レコードを保持して月平均計算に利用
+  const [records, setRecords] = useState([]);
 
   const member = members.find((m) => m.id === selectedMemberId);
 
@@ -358,7 +358,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
       try {
         const res = await fetch(`${GAS_API_URL}?action=getRecords&memberId=${member.id}`);
         const allRecords = await res.json();
-        setRecords(allRecords || []); // ★ 取得した全レコードをステートに保存
+        setRecords(allRecords || []);
         
         const currentRec = allRecords.find((r) => r.week === week);
         if (currentRec) {
@@ -405,9 +405,47 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
     );
   }
 
-  let avgRate = 0;
+  // 対象週の「月」を取得（例: 10/5週 -> 10）
+  const match = week ? week.match(/(\d{1,2})[\/\-月](\d{1,2})?/) : null;
+  let targetMonth = match ? parseInt(match[1], 10) : null;
+  const targetDay = match && match[2] ? parseInt(match[2], 10) : null;
+
+  if (targetMonth === 9 && targetDay && targetDay >= 28) {
+    targetMonth = 10;
+  }
+
+  // 同月の過去レコード（選択中の週を除く）を抽出
+  const pastMonthRecords = (records || []).filter((r) => {
+    const isTargetMember = (r.memberId && r.memberId === member?.id) || (r.name && r.name === member?.name);
+    if (!isTargetMember || !r.week || r.week === week) return false;
+
+    const rMatch = r.week.match(/(\d{1,2})[\/\-月](\d{1,2})?/);
+    if (rMatch) {
+      let m = parseInt(rMatch[1], 10);
+      let d = rMatch[2] ? parseInt(rMatch[2], 10) : null;
+      if (m === 9 && d && d >= 28) m = 10;
+      return m === targetMonth;
+    }
+    return false;
+  });
+
   const currentItems = member?.items || [];
 
+  // 各目標項目の月間累計実績値を算出（同月の過去週の実績 + 今週の入力値）
+  const monthlyTotals = {};
+  currentItems.forEach((it) => {
+    let sum = Number(achievements[it.id]?.actual ?? 0);
+    pastMonthRecords.forEach((r) => {
+      const ach = r.achievements || {};
+      if (ach[it.id]?.actual) {
+        sum += Number(ach[it.id].actual);
+      }
+    });
+    monthlyTotals[it.id] = sum;
+  });
+
+  // 全項目の平均達成率（週モード / 月累計モード）
+  let avgRate = 0;
   if (viewMode === "week") {
     avgRate = currentItems.length
       ? Math.round(
@@ -418,46 +456,15 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
         )
       : 0;
   } else {
-    const match = week ? week.match(/(\d{1,2})[\/\-月](\d{1,2})?/) : null;
-    let targetMonth = match ? parseInt(match[1], 10) : null;
-    const targetDay = match && match[2] ? parseInt(match[2], 10) : null;
-
-    if (targetMonth === 9 && targetDay && targetDay >= 28) {
-      targetMonth = 10;
-    }
-
-    const monthlyRates = [];
-    (records || []).forEach((r) => {
-      const isTargetMember = (r.memberId && r.memberId === member?.id) || (r.name && r.name === member?.name);
-      if (!isTargetMember || !r.week || r.achievementRate === undefined) return;
-
-      const rMatch = r.week.match(/(\d{1,2})[\/\-月](\d{1,2})?/);
-      if (rMatch) {
-        let m = parseInt(rMatch[1], 10);
-        let d = rMatch[2] ? parseInt(rMatch[2], 10) : null;
-        if (m === 9 && d && d >= 28) m = 10;
-
-        if (m === targetMonth) {
-          monthlyRates.push(Number(r.achievementRate));
-        }
-      }
-    });
-
-    const currentRate = currentItems.length
+    // 月累計モード：各項目の月累計実績に対する達成率の平均
+    avgRate = currentItems.length
       ? Math.round(
           currentItems.reduce((sum, it) => {
-            const actual = Number(achievements[it.id]?.actual ?? 0);
-            return sum + Math.min(100, (actual / it.target) * 100 || 0);
+            const totalActual = monthlyTotals[it.id] || 0;
+            return sum + Math.min(100, (totalActual / it.target) * 100 || 0);
           }, 0) / currentItems.length
         )
       : 0;
-
-    if (monthlyRates.length === 0) {
-      avgRate = currentRate;
-    } else {
-      const sum = monthlyRates.reduce((acc, curr) => acc + curr, 0);
-      avgRate = Math.round(sum / monthlyRates.length);
-    }
   }
 
   const save = async () => {
@@ -638,9 +645,9 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
                 </>
               ) : (
                 <>
-                  月間累計モード
+                  {targetMonth ? `${targetMonth}月` : ""}累計モード
                   <br />
-                  <span className="text-[#F0F6FC] font-semibold">最終週に向けて更新中</span>
+                  <span className="text-[#F0F6FC] font-semibold">過去週＋今週入力を自動集計</span>
                 </>
               )}
             </div>
@@ -649,10 +656,12 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
           <div className="space-y-3">
             {member.items.map((it) => {
               const actual = achievements[it.id]?.actual ?? "";
+              const valForCalc = viewMode === "week" ? Number(actual) || 0 : monthlyTotals[it.id] || 0;
               const rate = Math.min(
                 100,
-                Math.round(((Number(actual) || 0) / it.target) * 100)
+                Math.round((valForCalc / it.target) * 100)
               );
+
               return (
                 <div
                   key={it.id}
@@ -660,9 +669,16 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
                 >
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-semibold text-[#F0F6FC]">{it.label}</span>
-                    <span className="text-[#8B949E]">
-                      目標: <strong className="text-[#C9D1D9]">{it.target}</strong> {it.unit}
-                    </span>
+                    <div className="text-right">
+                      <span className="text-[#8B949E]">
+                        目標: <strong className="text-[#C9D1D9]">{it.target}</strong> {it.unit}
+                      </span>
+                      {viewMode === "month" && (
+                        <div className="text-[10px] text-[#F2B04B] font-semibold mt-0.5">
+                          今月累計: {monthlyTotals[it.id] || 0} {it.unit}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <input
