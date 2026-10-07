@@ -405,28 +405,31 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
     );
   }
 
-  // 対象週の「月」を取得（例: 10/5週 -> 10）
-  const match = week ? week.match(/(\d{1,2})[\/\-月](\d{1,2})?/) : null;
-  let targetMonth = match ? parseInt(match[1], 10) : null;
-  const targetDay = match && match[2] ? parseInt(match[2], 10) : null;
+  // 週の文字列から「月」と「日」を抽出し、月末週（28日以降など）を翌月扱いに補正するヘルパー関数
+  const getAdjustedMonth = (weekStr) => {
+    if (!weekStr) return null;
+    const match = weekStr.match(/(\d{1,2})[\/\-月](\d{1,2})?/);
+    if (!match) return null;
+    let m = parseInt(match[1], 10);
+    let d = match[2] ? parseInt(match[2], 10) : null;
 
-  if (targetMonth === 9 && targetDay && targetDay >= 28) {
-    targetMonth = 10;
-  }
+    // 9月28日〜31日（存在しないが）や9/28週などは10月扱いにする
+    if (m === 9 && d && d >= 28) {
+      return 10;
+    }
+    // 一般的な月末週（8/31週など）も翌月扱いにしたい場合はここに追加可能ですが、
+    // まずはご要望の「9/28週を10月に含める」に対応します
+    return m;
+  };
 
-  // 同月の過去レコード（選択中の週を除く）を抽出
+  const targetMonth = getAdjustedMonth(week);
+
+  // 同月の過去レコード（選択中の週を除く）を抽出（9/28週なども10月として判定）
   const pastMonthRecords = (records || []).filter((r) => {
     const isTargetMember = (r.memberId && r.memberId === member?.id) || (r.name && r.name === member?.name);
     if (!isTargetMember || !r.week || r.week === week) return false;
 
-    const rMatch = r.week.match(/(\d{1,2})[\/\-月](\d{1,2})?/);
-    if (rMatch) {
-      let m = parseInt(rMatch[1], 10);
-      let d = rMatch[2] ? parseInt(rMatch[2], 10) : null;
-      if (m === 9 && d && d >= 28) m = 10;
-      return m === targetMonth;
-    }
-    return false;
+    return getAdjustedMonth(r.week) === targetMonth;
   });
 
   const currentItems = member?.items || [];
@@ -647,7 +650,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
                 <>
                   {targetMonth ? `${targetMonth}月` : ""}累計モード
                   <br />
-                  <span className="text-[#F0F6FC] font-semibold">過去週＋今週入力を自動集計</span>
+                  <span className="text-[#F0F6FC] font-semibold">9/28週等も含めて自動集計</span>
                 </>
               )}
             </div>
