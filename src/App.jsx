@@ -1,522 +1,46 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
+import { Calendar, Save, Plus, X } from "lucide-react";
 import {
-  Plus,
-  Trash2,
-  ChevronUp,
-  ChevronDown,
-  Users,
-  ClipboardList,
-  TrendingUp,
-  Target,
-  AlertCircle
-} from "lucide-react";
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ReferenceLine,
+  ResponsiveContainer
+} from "recharts";
 
-const GAS_API_URL =
-  "https://script.google.com/macros/s/AKfycbxsLMkvdwgKjjhEiqbLYON7IwTeqsPGwfRMCD6B3ooiM01FvVyhkHMbCEVjheR7Pe-0Gw/exec";
-
-const NAV_ITEMS = [
-  { id: "members", label: "メンバー設定", icon: Users },
-  { id: "sheet", label: "1on1シート", icon: ClipboardList },
-  { id: "history", label: "達成率推移", icon: TrendingUp },
-];
-
-export function currentWeekLabel() {
-  const d = new Date();
-  const day = d.getDay();
-  const monday = new Date(d);
-  monday.setDate(d.getDate() - ((day + 6) % 7));
-  const m = monday.getMonth() + 1;
-  const dt = monday.getDate();
-  return `${m}/${dt}週`;
-}
-
-export default function OneOnOneBoard() {
-  const [tab, setTab] = useState("members");
-  const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedMemberId, setSelectedMemberId] = useState(null);
-  const [errorMessage, setErrorMessage] = useState("");
-
-  // itemsがJSON文字列で戻ってきた場合に配列化するヘルパー
-  const parseMemberItems = (data) => {
-    if (!Array.isArray(data)) return [];
-    return data.map((m) => {
-      let items = m.items;
-      if (typeof items === "string") {
-        try {
-          items = JSON.parse(items);
-        } catch (e) {
-          items = [];
-        }
-      }
-      return { ...m, items: items || [] };
-    });
-  };
-
-  const fetchMembers = useCallback(async () => {
-    setLoading(true);
-    setErrorMessage("");
-    try {
-      const res = await fetch(`${GAS_API_URL}?action=getMembers`);
-      const data = await res.json();
-      const parsed = parseMemberItems(data);
-      setMembers(parsed);
-      if (parsed.length && !selectedMemberId) {
-        setSelectedMemberId(parsed[0].id);
-      }
-    } catch (e) {
-      console.error(e);
-      setErrorMessage(
-        "メンバー情報の読み込みに失敗しました。GASのURLや通信状況を確認してください。"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedMemberId]);
-
-  useEffect(() => {
-    fetchMembers();
-  }, []);
-
-  if (loading && members.length === 0) {
-    return (
-      <div className="min-h-screen bg-[#0D1117] flex items-center justify-center text-[#F0F6FC] font-sans text-sm tracking-wide">
-        スプレッドシートと同期中…
-      </div>
-    );
+// ================= 共通ヘルパー関数 =================
+// 週文字列（例: "2026-09-28", "9/28", "9月28日週"）から「月」と「日」を解析し、28日以降は翌月扱いにする
+function getAdjustedMonth(weekStr) {
+  if (!weekStr) return null;
+  const match = weekStr.match(/(\d{1,2})[\/\-月](\d{1,2})/);
+  if (!match) {
+    const mMatch = weekStr.match(/(\d{1,2})/);
+    return mMatch ? parseInt(mMatch[1], 10) : null;
   }
+  let m = parseInt(match[1], 10);
+  let d = parseInt(match[2], 10);
 
-  return (
-    <div className="min-h-screen bg-[#0D1117] text-[#F0F6FC] font-sans selection:bg-[#E8A33D]/30">
-      <Header />
-      <div className="max-w-2xl mx-auto px-4 pb-32">
-        {errorMessage && (
-          <div className="mt-4 bg-[#ED4245]/15 border border-[#ED4245]/40 text-[#FF8585] px-4 py-3 rounded-xl text-xs font-medium flex items-center gap-2 shadow-sm">
-            <AlertCircle size={16} className="shrink-0" />
-            {errorMessage}
-          </div>
-        )}
-        {tab === "members" && (
-          <MemberSettingTab
-            members={members}
-            setMembers={setMembers}
-            GAS_API_URL={GAS_API_URL}
-          />
-        )}
-        {tab === "sheet" && (
-          <SheetTab
-            members={members}
-            selectedMemberId={selectedMemberId}
-            setSelectedMemberId={setSelectedMemberId}
-          />
-        )}
-        {tab === "history" && (
-          <HistoryTab
-            members={members}
-            selectedMemberId={selectedMemberId}
-            setSelectedMemberId={setSelectedMemberId}
-          />
-        )}
-      </div>
-      <BottomNav tab={tab} setTab={setTab} />
-    </div>
-  );
+  // 28日以降の週は翌月扱いにするルール
+  if (d >= 28) {
+    m = m === 12 ? 1 : m + 1;
+  }
+  return m;
 }
 
-function Header() {
-  return (
-    <div className="sticky top-0 z-20 bg-[#0D1117]/90 backdrop-blur-md border-b border-[#30363D] px-4 pt-5 pb-4 shadow-sm">
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center gap-2 text-[#F2B04B] text-[11px] font-bold tracking-widest uppercase mb-1">
-          <Target size={14} strokeWidth={2.5} />
-          Weekly 1on1 Board
-        </div>
-        <h1 className="text-xl font-bold tracking-tight text-[#F0F6FC]">
-          達成率チェックシート
-        </h1>
-      </div>
-    </div>
-  );
-}
-
-function BottomNav({ tab, setTab }) {
-  return (
-    <div className="fixed bottom-0 left-0 right-0 bg-[#161B22]/95 backdrop-blur-md border-t border-[#30363D] z-20 shadow-lg">
-      <div className="max-w-2xl mx-auto flex">
-        {NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          const active = tab === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setTab(item.id)}
-              className={`flex-1 flex flex-col items-center gap-1.5 py-3 transition-all ${
-                active
-                  ? "text-[#F2B04B] font-semibold"
-                  : "text-[#8B949E] hover:text-[#C9D1D9]"
-              }`}
-            >
-              <Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
-              <span className="text-[11px] tracking-wide">{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ================= MEMBER SETTING TAB =================
-export function MemberSettingTab({ members = [], setMembers, GAS_API_URL }) {
-  const [newName, setNewName] = useState("");
-  const [openMemberId, setOpenMemberId] = useState(members[0]?.id || null);
-  const [newItemLabels, setNewItemLabels] = useState({});
-  const [newItemTargets, setNewItemTargets] = useState({});
-  const [newItemUnits, setNewItemUnits] = useState({});
-  const [loading, setLoading] = useState(false);
-
-  const addMember = async () => {
-    if (!newName.trim()) return;
-    setLoading(true);
-    const payload = {
-      action: "saveMember",
-      payload: { name: newName.trim(), items: [] }
-    };
-    try {
-      const res = await fetch(GAS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify(payload)
-      });
-      const result = await res.json();
-      if (result.status === "success") {
-        const listRes = await fetch(`${GAS_API_URL}?action=getMembers`);
-        const list = await listRes.json();
-        setMembers(list || []);
-        setNewName("");
-      }
-    } catch (e) {
-      console.error(e);
-      alert("メンバーの追加に失敗しました");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const saveMemberName = async (memberId, updatedName) => {
-    const trimmed = updatedName?.trim() || "";
-    if (!trimmed) return;
-
-    const targetMember = members.find((m) => m.id === memberId);
-    if (!targetMember || targetMember.name === trimmed) return;
-
-    const payload = {
-      action: "saveMember",
-      payload: {
-        id: memberId,
-        name: trimmed,
-        items: JSON.stringify(targetMember.items || [])
-      }
-    };
-
-    try {
-      const res = await fetch(GAS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify(payload)
-      });
-      const result = await res.json();
-      if (result.status !== "success") {
-        console.error("名前の保存に失敗しました");
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const deleteMember = async (memberId) => {
-    if (!confirm("このメンバーを削除しますか？")) return;
-    setLoading(true);
-    try {
-      const res = await fetch(GAS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({ action: "deleteMember", payload: { id: memberId } })
-      });
-      const result = await res.json();
-      if (result.status === "success") {
-        setMembers(members.filter((m) => m.id !== memberId));
-      }
-    } catch (e) {
-      console.error(e);
-      alert("削除に失敗しました");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const addItem = async (memberId) => {
-    const label = newItemLabels[memberId];
-    const target = Number(newItemTargets[memberId]) || 0;
-    const unit = newItemUnits[memberId] || "件";
-
-    if (!label || !target) {
-      alert("項目名と目標数値を入力してください");
-      return;
-    }
-
-    const targetMember = members.find((m) => m.id === memberId);
-    if (!targetMember) return;
-
-    const newItems = [
-      ...(targetMember.items || []),
-      { id: "item_" + Date.now(), label, target, unit }
-    ];
-
-    setLoading(true);
-    const payload = {
-      action: "saveMember",
-      payload: {
-        id: targetMember.id,
-        name: targetMember.name || "",
-        items: JSON.stringify(newItems)
-      }
-    };
-
-    try {
-      const res = await fetch(GAS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify(payload)
-      });
-      const result = await res.json();
-      if (result.status === "success") {
-        setMembers(
-          members.map((m) => (m.id === memberId ? { ...m, items: newItems } : m))
-        );
-        setNewItemLabels({ ...newItemLabels, [memberId]: "" });
-        setNewItemTargets({ ...newItemTargets, [memberId]: "" });
-      }
-    } catch (e) {
-      console.error(e);
-      alert("項目の追加に失敗しました");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const removeItem = async (memberId, itemId) => {
-    const targetMember = members.find((m) => m.id === memberId);
-    if (!targetMember) return;
-
-    const newItems = (targetMember.items || []).filter((it) => it.id !== itemId);
-
-    setLoading(true);
-    const payload = {
-      action: "saveMember",
-      payload: {
-        id: targetMember.id,
-        name: targetMember.name || "",
-        items: JSON.stringify(newItems)
-      }
-    };
-
-    try {
-      const res = await fetch(GAS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify(payload)
-      });
-      const result = await res.json();
-      if (result.status === "success") {
-        setMembers(
-          members.map((m) => (m.id === memberId ? { ...m, items: newItems } : m))
-        );
-      }
-    } catch (e) {
-      console.error(e);
-      alert("項目の削除に失敗しました");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="pt-5 space-y-5">
-      <div className="text-xs text-[#8B949E] leading-relaxed bg-[#161B22] border border-[#30363D] rounded-xl p-3.5">
-        メンバーごとに追う目標項目（KPI）を登録します。データは全員共通で更新されます。
-      </div>
-
-      <div className="flex gap-2">
-        <input
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          placeholder="メンバー名（例: 田中さん）"
-          className="flex-1 bg-[#161B22] border border-[#30363D] rounded-xl px-3.5 py-2.5 text-xs text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
-        />
-        <button
-          onClick={addMember}
-          disabled={loading}
-          className="bg-[#F2B04B] hover:bg-[#E8A33D] text-[#0D1117] font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1 shrink-0 active:scale-95 transition-all shadow-sm disabled:opacity-50"
-        >
-          <Plus size={15} strokeWidth={2.5} />
-          追加
-        </button>
-      </div>
-
-      <div className="space-y-3">
-        {(members || []).map((m) => {
-          const isOpen = openMemberId === m.id;
-          const items = Array.isArray(m.items) ? m.items : [];
-
-          return (
-            <div
-              key={m.id}
-              className="bg-[#161B22] border border-[#30363D] rounded-xl overflow-hidden shadow-sm transition-all"
-            >
-              <div
-                onClick={() => setOpenMemberId(isOpen ? null : m.id)}
-                className="p-4 flex items-center justify-between cursor-pointer hover:bg-[#21262D]/50"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-[#F2B04B]/10 border border-[#F2B04B]/30 text-[#F2B04B] flex items-center justify-center font-bold text-xs">
-                    {m.name ? m.name.slice(0, 1) : "?"}
-                  </div>
-                  <div>
-                    <input
-                      type="text"
-                      value={m.name || ""}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => {
-                        const updated = e.target.value;
-                        setMembers(
-                          members.map((mem) =>
-                            mem.id === m.id ? { ...mem, name: updated } : mem
-                          )
-                        );
-                      }}
-                      onBlur={(e) => saveMemberName(m.id, e.target.value)}
-                      className="bg-transparent font-bold text-xs text-[#F0F6FC] focus:outline-none focus:border-b focus:border-[#F2B04B] w-32"
-                    />
-                    <div className="text-[11px] text-[#8B949E] mt-0.5">
-                      目標項目：{items.length}件
-                    </div>
-                  </div>
-                </div>
-                <div className="text-[#8B949E]">
-                  {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </div>
-              </div>
-
-              {isOpen && (
-                <div className="px-4 pb-4 pt-1 border-t border-[#30363D] space-y-3 bg-[#0D1117]/40">
-                  <div className="space-y-2 pt-2">
-                    {items.map((it) => (
-                      <div
-                        key={it.id}
-                        className="bg-[#161B22] border border-[#30363D] rounded-lg px-3 py-2.5 flex items-center justify-between text-xs"
-                      >
-                        <span className="font-semibold text-[#F0F6FC]">
-                          {it.label}{" "}
-                          <span className="text-[#8B949E] font-normal ml-1">
-                            (目標: {it.target}
-                            {it.unit}/月)
-                          </span>
-                        </span>
-                        <button
-                          onClick={() => removeItem(m.id, it.id)}
-                          className="text-[#6E7681] hover:text-[#FF8585] p-1 transition-colors"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-3 space-y-2.5">
-                    <div className="text-[11px] font-bold text-[#8B949E]">
-                      新しい目標項目を追加
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        value={newItemLabels[m.id] || ""}
-                        onChange={(e) =>
-                          setNewItemLabels({
-                            ...newItemLabels,
-                            [m.id]: e.target.value
-                          })
-                        }
-                        placeholder="項目名（例: 紹介数）"
-                        className="flex-1 bg-[#0D1117] border border-[#30363D] rounded-lg px-2.5 py-1.5 text-xs text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
-                      />
-                      <input
-                        value={newItemTargets[m.id] || ""}
-                        onChange={(e) =>
-                          setNewItemTargets({
-                            ...newItemTargets,
-                            [m.id]: e.target.value.replace(/[^0-9]/g, "")
-                          })
-                        }
-                        inputMode="numeric"
-                        placeholder="目標"
-                        className="w-14 bg-[#0D1117] border border-[#30363D] rounded-lg px-2.5 py-1.5 text-xs text-center text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
-                      />
-                      <select
-                        value={newItemUnits[m.id] || "件"}
-                        onChange={(e) =>
-                          setNewItemUnits({
-                            ...newItemUnits,
-                            [m.id]: e.target.value
-                          })
-                        }
-                        className="w-16 bg-[#0D1117] border border-[#30363D] rounded-lg px-2 py-1.5 text-xs text-[#F0F6FC] focus:outline-none focus:border-[#F2B04B]"
-                      >
-                        <option value="件">件</option>
-                        <option value="万円">万円</option>
-                        <option value="回">回</option>
-                        <option value="人">人</option>
-                        <option value="本">本</option>
-                      </select>
-                      <button
-                        onClick={() => addItem(m.id)}
-                        disabled={loading}
-                        className="bg-[#21262D] hover:bg-[#30363D] border border-[#30363D] text-[#F2B04B] p-2 rounded-lg shrink-0 flex items-center justify-center transition-all disabled:opacity-50"
-                      >
-                        <Plus size={15} strokeWidth={2.5} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="pt-1 text-right">
-                    <button
-                      onClick={() => deleteMember(m.id)}
-                      className="text-[11px] text-[#FF8585] hover:underline flex items-center gap-1 ml-auto font-medium"
-                    >
-                      <Trash2 size={12} />
-                      このメンバーを削除
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// 他タブのダミーコンポーネント
-function SheetTab() {
-  return <div className="pt-5 text-xs text-[#8B949E]">1on1シートタブのコンテンツ</div>;
-}
-
-function HistoryTab() {
-  return <div className="pt-5 text-xs text-[#8B949E]">達成率推移タブのコンテンツ</div>;
-}
 // ================= SHEET TAB =================
-function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
-  const [week, setWeek] = useState(currentWeekLabel());
+export function SheetTab({
+  members,
+  selectedMemberId,
+  setSelectedMemberId,
+  GAS_API_URL,
+  currentWeekLabel
+}) {
+  const [week, setWeek] = useState(() =>
+    typeof currentWeekLabel === "function" ? currentWeekLabel() : ""
+  );
   const [viewMode, setViewMode] = useState("week");
   const [achievements, setAchievements] = useState({});
   const [reflection, setReflection] = useState("");
@@ -530,16 +54,19 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
   const member = members.find((m) => m.id === selectedMemberId);
 
   useEffect(() => {
-    if (!member) return;
+    if (!member || !GAS_API_URL) return;
+    let ignore = false;
     setLoadingRecord(true);
 
     (async () => {
       try {
         const res = await fetch(`${GAS_API_URL}?action=getRecords&memberId=${member.id}`);
         const allRecords = await res.json();
+        if (ignore) return;
+
         setRecords(allRecords || []);
-        
-        const currentRec = allRecords.find((r) => r.week === week);
+
+        const currentRec = (allRecords || []).find((r) => r.week === week);
         if (currentRec) {
           setAchievements(currentRec.achievements || {});
           setReflection(currentRec.reflection || "");
@@ -554,9 +81,11 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
           setReflection("");
           setNextActions([{ when: "", who: "", what: "" }]);
 
-          if (allRecords.length > 0) {
+          if (allRecords && allRecords.length > 0) {
             const prevRec = allRecords[allRecords.length - 1];
-            const prevActions = (prevRec?.nextActions || []).filter((a) => a.when || a.who || a.what);
+            const prevActions = (prevRec?.nextActions || []).filter(
+              (a) => a.when || a.who || a.what
+            );
             setExecutionChecks(prevActions.map((a) => ({ ...a, done: null, note: "" })));
 
             const prevExec = prevRec?.executionChecks || [];
@@ -568,13 +97,21 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
           }
         }
       } catch (e) {
-        console.error(e);
+        if (!ignore) {
+          console.error("レコードの取得に失敗しました:", e);
+        }
       } finally {
-        setLoadingRecord(false);
-        setSaved(false);
+        if (!ignore) {
+          setLoadingRecord(false);
+          setSaved(false);
+        }
       }
     })();
-  }, [member?.id, week]);
+
+    return () => {
+      ignore = true;
+    };
+  }, [member?.id, week, GAS_API_URL]);
 
   if (!members.length) {
     return (
@@ -584,28 +121,12 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
     );
   }
 
-  // 週の文字列から「月」と「日」を抽出し、月末週（28日以降など）を翌月扱いに補正するヘルパー関数
-  const getAdjustedMonth = (weekStr) => {
-    if (!weekStr) return null;
-    const match = weekStr.match(/(\d{1,2})[\/\-月](\d{1,2})?/);
-    if (!match) return null;
-    let m = parseInt(match[1], 10);
-    let d = match[2] ? parseInt(match[2], 10) : null;
-
-    // 9月28日〜31日（存在しないが）や9/28週などは10月扱いにする
-    if (m === 9 && d && d >= 28) {
-      return 10;
-    }
-    // 一般的な月末週（8/31週など）も翌月扱いにしたい場合はここに追加可能ですが、
-    // まずはご要望の「9/28週を10月に含める」に対応します
-    return m;
-  };
-
   const targetMonth = getAdjustedMonth(week);
 
-  // 同月の過去レコード（選択中の週を除く）を抽出（9/28週なども10月として判定）
+  // 同月の過去レコード（選択中の週を除く）
   const pastMonthRecords = (records || []).filter((r) => {
-    const isTargetMember = (r.memberId && r.memberId === member?.id) || (r.name && r.name === member?.name);
+    const isTargetMember =
+      (r.memberId && r.memberId === member?.id) || (r.name && r.name === member?.name);
     if (!isTargetMember || !r.week || r.week === week) return false;
 
     return getAdjustedMonth(r.week) === targetMonth;
@@ -613,7 +134,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
 
   const currentItems = member?.items || [];
 
-  // 各目標項目の月間累計実績値を算出（同月の過去週の実績 + 今週の入力値）
+  // 各目標項目の月間累計実績値
   const monthlyTotals = {};
   currentItems.forEach((it) => {
     let sum = Number(achievements[it.id]?.actual ?? 0);
@@ -626,30 +147,27 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
     monthlyTotals[it.id] = sum;
   });
 
-  // 全項目の平均達成率（週モード / 月累計モード）
+  // 平均達成率（週 / 月累計）
   let avgRate = 0;
-  if (viewMode === "week") {
-    avgRate = currentItems.length
-      ? Math.round(
-          currentItems.reduce((sum, it) => {
-            const actual = Number(achievements[it.id]?.actual ?? 0);
-            return sum + Math.min(100, (actual / it.target) * 100 || 0);
-          }, 0) / currentItems.length
-        )
-      : 0;
-  } else {
-    // 月累計モード：各項目の月累計実績に対する達成率の平均
-    avgRate = currentItems.length
-      ? Math.round(
-          currentItems.reduce((sum, it) => {
-            const totalActual = monthlyTotals[it.id] || 0;
-            return sum + Math.min(100, (totalActual / it.target) * 100 || 0);
-          }, 0) / currentItems.length
-        )
-      : 0;
+  if (currentItems.length > 0) {
+    const totalRate = currentItems.reduce((sum, it) => {
+      const targetVal = Number(it.target) || 0;
+      if (targetVal <= 0) return sum;
+
+      const valForCalc =
+        viewMode === "week"
+          ? Number(achievements[it.id]?.actual ?? 0)
+          : monthlyTotals[it.id] || 0;
+
+      const itemRate = Math.min(100, (valForCalc / targetVal) * 100);
+      return sum + itemRate;
+    }, 0);
+
+    avgRate = Math.round(totalRate / currentItems.length);
   }
 
   const save = async () => {
+    if (!member) return;
     setLoadingRecord(true);
     const cleanActions = nextActions.filter((a) => a.when || a.who || a.what);
 
@@ -677,6 +195,8 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
       if (result.status === "success") {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
+      } else {
+        throw new Error(result.message || "Save failed");
       }
     } catch (e) {
       alert("保存に失敗しました。通信環境を確認してください。");
@@ -688,6 +208,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
 
   return (
     <div className="pt-5 space-y-5">
+      {/* メンバー切り替え */}
       <div className="flex gap-2 overflow-x-auto pb-1.5 -mx-4 px-4 scrollbar-none">
         {members.map((m) => (
           <button
@@ -703,7 +224,8 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
           </button>
         ))}
       </div>
-      
+
+      {/* 対象週 */}
       <div className="flex items-center gap-2.5 bg-[#161B22] border border-[#30363D] rounded-xl px-3.5 py-2.5 text-xs text-[#C9D1D9]">
         <Calendar size={15} className="text-[#8B949E] shrink-0" />
         <span className="text-[#8B949E]">対象週:</span>
@@ -713,7 +235,8 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
           className="bg-transparent flex-1 text-xs font-semibold text-[#F0F6FC] focus:outline-none"
         />
       </div>
-      
+
+      {/* モード切り替え */}
       <div className="flex bg-[#161B22] border border-[#30363D] p-1 rounded-xl gap-1">
         <button
           onClick={() => setViewMode("week")}
@@ -737,6 +260,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
         </button>
       </div>
 
+      {/* 目標未設定 */}
       {member && (!member.items || member.items.length === 0) && (
         <div className="text-xs text-[#8B949E] text-center py-10 bg-[#161B22]/50 border border-[#30363D] rounded-xl">
           {member.name}さんの目標項目が未登録です。「メンバー設定」で追加してください。
@@ -745,6 +269,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
 
       {member && member.items && member.items.length > 0 && (
         <>
+          {/* 先週のアクション振り返り */}
           {executionChecks.length > 0 && (
             <div className="bg-[#161B22] border border-[#ED4245]/30 rounded-xl p-4 space-y-3 shadow-sm">
               <div className="text-[11px] font-bold text-[#FF8585] uppercase tracking-wider flex items-center gap-1.5">
@@ -809,6 +334,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
             </div>
           )}
 
+          {/* 平均達成率表示 */}
           <div className="bg-gradient-to-r from-[#161B22] to-[#21262D] border border-[#30363D] rounded-xl p-4.5 flex items-center justify-between shadow-sm">
             <div>
               <div className="text-[11px] font-bold text-[#8B949E] uppercase tracking-wider">
@@ -829,20 +355,19 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
                 <>
                   {targetMonth ? `${targetMonth}月` : ""}累計モード
                   <br />
-                  <span className="text-[#F0F6FC] font-semibold">9/28週等も含めて自動集計</span>
+                  <span className="text-[#F0F6FC] font-semibold">月末28日以降も含めて自動集計</span>
                 </>
               )}
             </div>
           </div>
 
+          {/* 各目標項目の入力欄 */}
           <div className="space-y-3">
             {member.items.map((it) => {
               const actual = achievements[it.id]?.actual ?? "";
               const valForCalc = viewMode === "week" ? Number(actual) || 0 : monthlyTotals[it.id] || 0;
-              const rate = Math.min(
-                100,
-                Math.round((valForCalc / it.target) * 100)
-              );
+              const targetVal = Number(it.target) || 0;
+              const rate = targetVal > 0 ? Math.min(100, Math.round((valForCalc / targetVal) * 100)) : 0;
 
               return (
                 <div
@@ -865,12 +390,16 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
                   <div className="flex items-center gap-3">
                     <input
                       value={actual}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[０-９]/g, (s) =>
+                          String.fromCharCode(s.charCodeAt(0) - 0xfee0)
+                        );
+                        const clean = raw.replace(/[^0-9.]/g, "");
                         setAchievements({
                           ...achievements,
-                          [it.id]: { actual: e.target.value.replace(/[^0-9.]/g, "") },
-                        })
-                      }
+                          [it.id]: { actual: clean }
+                        });
+                      }}
                       inputMode="decimal"
                       placeholder="0"
                       className="w-16 bg-[#0D1117] border border-[#30363D] rounded-lg px-2 py-1.5 text-xs text-center font-bold text-[#F0F6FC] focus:outline-none focus:border-[#F2B04B]"
@@ -891,6 +420,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
             })}
           </div>
 
+          {/* 振り返りとアクション作成 */}
           <div className="space-y-4 pt-1">
             <div>
               <label className="text-xs font-bold text-[#C9D1D9] mb-1.5 block">
@@ -976,13 +506,20 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
             </div>
           </div>
 
+          {/* 保存ボタン */}
           <button
             onClick={save}
             disabled={loadingRecord}
-            className="w-full bg-[#F2B04B] hover:bg-[#E8A33D] text-[#0D1117] font-bold text-sm rounded-xl py-3.5 flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-md mt-2"
+            className={`w-full text-[#0D1117] font-bold text-sm rounded-xl py-3.5 flex items-center justify-center gap-2 transition-all shadow-md mt-2 ${
+              loadingRecord
+                ? "bg-[#F2B04B]/60 cursor-not-allowed"
+                : "bg-[#F2B04B] hover:bg-[#E8A33D] active:scale-[0.98]"
+            }`}
           >
             {saved ? (
               "保存を完了しました！"
+            ) : loadingRecord ? (
+              "保存中..."
             ) : (
               <>
                 <Save size={16} strokeWidth={2.5} />
@@ -997,7 +534,12 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
 }
 
 // ================= HISTORY TAB =================
-function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
+export function HistoryTab({
+  members,
+  selectedMemberId,
+  setSelectedMemberId,
+  GAS_API_URL
+}) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [historyViewMode, setHistoryViewMode] = useState("week");
@@ -1005,20 +547,32 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
   const member = members.find((m) => m.id === selectedMemberId);
 
   useEffect(() => {
-    if (!member) return;
+    if (!member || !GAS_API_URL) return;
+    let ignore = false;
     setLoading(true);
+
     (async () => {
       try {
         const res = await fetch(`${GAS_API_URL}?action=getRecords&memberId=${member.id}`);
         const data = await res.json();
-        setRecords(data || []);
+        if (!ignore) {
+          setRecords(data || []);
+        }
       } catch (e) {
-        console.error(e);
+        if (!ignore) {
+          console.error("履歴データの取得に失敗しました:", e);
+        }
       } finally {
-        setLoading(false);
+        if (!ignore) {
+          setLoading(false);
+        }
       }
     })();
-  }, [member?.id]);
+
+    return () => {
+      ignore = true;
+    };
+  }, [member?.id, GAS_API_URL]);
 
   if (!members.length) {
     return (
@@ -1038,44 +592,36 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
   records.forEach((r) => {
     if (!r.week || r.achievementRate === undefined || r.achievementRate === null) return;
 
-    const match = r.week.match(/(\d{1,2})[\/\-月](\d{1,2})?/);
+    const adjustedMonth = getAdjustedMonth(r.week);
+    const monthKey = adjustedMonth ? `${adjustedMonth}月` : r.week;
 
-    if (match) {
-      let month = parseInt(match[1], 10);
-      const day = match[2] ? parseInt(match[2], 10) : null;
-
-      if (month === 9 && day && day >= 28) {
-        month = 10;
-      }
-
-      const monthKey = `${month}月`;
-      if (!monthlyRatesMap[monthKey]) {
-        monthlyRatesMap[monthKey] = [];
-      }
-      monthlyRatesMap[monthKey].push(Number(r.achievementRate));
-    } else {
-      if (!monthlyRatesMap[r.week]) {
-        monthlyRatesMap[r.week] = [];
-      }
-      monthlyRatesMap[r.week].push(Number(r.achievementRate));
+    if (!monthlyRatesMap[monthKey]) {
+      monthlyRatesMap[monthKey] = {
+        sum: 0,
+        count: 0,
+        sortKey: adjustedMonth || 99
+      };
     }
+    monthlyRatesMap[monthKey].sum += Number(r.achievementRate);
+    monthlyRatesMap[monthKey].count += 1;
   });
 
-  const monthlyChartData = Object.keys(monthlyRatesMap).map((key) => {
-    const rates = monthlyRatesMap[key];
-    const sum = rates.reduce((acc, curr) => acc + curr, 0);
-    const avg = rates.length > 0 ? Math.round(sum / rates.length) : 0;
-
-    return {
-      label: key,
-      rate: avg
-    };
-  });
+  const monthlyChartData = Object.keys(monthlyRatesMap)
+    .sort((a, b) => monthlyRatesMap[a].sortKey - monthlyRatesMap[b].sortKey)
+    .map((key) => {
+      const data = monthlyRatesMap[key];
+      const avg = data.count > 0 ? Math.round(data.sum / data.count) : 0;
+      return {
+        label: key,
+        rate: avg
+      };
+    });
 
   const chartData = historyViewMode === "week" ? weeklyChartData : monthlyChartData;
 
   return (
     <div className="pt-5 space-y-5">
+      {/* メンバー切り替え */}
       <div className="flex gap-2 overflow-x-auto pb-1.5 -mx-4 px-4 scrollbar-none">
         {members.map((m) => (
           <button
@@ -1100,6 +646,7 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
         </div>
       ) : (
         <>
+          {/* 表示モード切り替え */}
           <div className="flex bg-[#161B22] border border-[#30363D] p-1 rounded-xl gap-1 mb-4">
             <button
               onClick={() => setHistoryViewMode("week")}
@@ -1123,22 +670,48 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
             </button>
           </div>
 
+          {/* グラフ表示 */}
           <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-4.5 shadow-sm">
             <div className="text-xs font-bold text-[#C9D1D9] mb-3">
-              {historyViewMode === "week" ? "週別 達成率推移グラフ（%）" : "月別 達成率推移グラフ（%）"}
+              {historyViewMode === "week"
+                ? "週別 達成率推移グラフ（%）"
+                : "月別 達成率推移グラフ（%）"}
             </div>
             <ResponsiveContainer width="100%" height={190}>
               <LineChart data={chartData} margin={{ top: 8, right: 12, left: -24, bottom: 0 }}>
                 <CartesianGrid stroke="#30363D" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="label" tick={{ fill: "#8B949E", fontSize: 10 }} axisLine={{ stroke: "#30363D" }} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fill: "#8B949E", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: "#8B949E", fontSize: 10 }}
+                  axisLine={{ stroke: "#30363D" }}
+                  tickLine={false}
+                />
+                <YAxis
+                  domain={[0, 100]}
+                  tick={{ fill: "#8B949E", fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
                 <ReferenceLine y={70} stroke="#ED4245" strokeDasharray="4 4" />
                 <Tooltip
-                  contentStyle={{ background: "#161B22", border: "1px solid #30363D", borderRadius: 8, fontSize: 12, color: "#F0F6FC" }}
+                  contentStyle={{
+                    background: "#161B22",
+                    border: "1px solid #30363D",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    color: "#F0F6FC"
+                  }}
                   labelStyle={{ color: "#F2B04B", fontWeight: "bold" }}
                   formatter={(value) => [`${value}%`, "達成率"]}
                 />
-                <Line type="monotone" dataKey="rate" name="達成率" stroke="#F2B04B" strokeWidth={2.5} dot={{ r: 4, fill: "#F2B04B" }} />
+                <Line
+                  type="monotone"
+                  dataKey="rate"
+                  name="達成率"
+                  stroke="#F2B04B"
+                  strokeWidth={2.5}
+                  dot={{ r: 4, fill: "#F2B04B" }}
+                />
               </LineChart>
             </ResponsiveContainer>
             <div className="text-[10px] text-[#8B949E] mt-2 flex items-center gap-1.5">
@@ -1147,9 +720,13 @@ function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
             </div>
           </div>
 
+          {/* 過去ログ一覧 */}
           <div className="space-y-3">
             {[...records].reverse().map((rec, idx) => (
-              <div key={idx} className="bg-[#161B22] border border-[#30363D] rounded-xl p-4 shadow-sm space-y-2">
+              <div
+                key={idx}
+                className="bg-[#161B22] border border-[#30363D] rounded-xl p-4 shadow-sm space-y-2"
+              >
                 <div className="text-xs font-bold text-[#F2B04B] border-b border-[#30363D]/60 pb-1.5 flex justify-between">
                   <span>{rec.week}</span>
                   <span className="text-[#C9D1D9]">達成率: {rec.achievementRate}%</span>
