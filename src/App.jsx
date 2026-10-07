@@ -405,7 +405,6 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
     );
   }
 
-  // 週の文字列から「月」と「日」を抽出し、月末週（28日以降など）を翌月扱いに補正するヘルパー関数
   const getAdjustedMonth = (weekStr) => {
     if (!weekStr) return null;
     const match = weekStr.match(/(\d{1,2})[\/\-月](\d{1,2})?/);
@@ -413,18 +412,14 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
     let m = parseInt(match[1], 10);
     let d = match[2] ? parseInt(match[2], 10) : null;
 
-    // 9月28日〜31日（存在しないが）や9/28週などは10月扱いにする
     if (m === 9 && d && d >= 28) {
       return 10;
     }
-    // 一般的な月末週（8/31週など）も翌月扱いにしたい場合はここに追加可能ですが、
-    // まずはご要望の「9/28週を10月に含める」に対応します
     return m;
   };
 
   const targetMonth = getAdjustedMonth(week);
 
-  // 同月の過去レコード（選択中の週を除く）を抽出（9/28週なども10月として判定）
   const pastMonthRecords = (records || []).filter((r) => {
     const isTargetMember = (r.memberId && r.memberId === member?.id) || (r.name && r.name === member?.name);
     if (!isTargetMember || !r.week || r.week === week) return false;
@@ -434,7 +429,6 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
 
   const currentItems = member?.items || [];
 
-  // 各目標項目の月間累計実績値を算出（同月の過去週の実績 + 今週の入力値）
   const monthlyTotals = {};
   currentItems.forEach((it) => {
     let sum = Number(achievements[it.id]?.actual ?? 0);
@@ -447,7 +441,6 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
     monthlyTotals[it.id] = sum;
   });
 
-  // 全項目の平均達成率（週モード / 月累計モード）
   let avgRate = 0;
   if (viewMode === "week") {
     avgRate = currentItems.length
@@ -459,7 +452,6 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
         )
       : 0;
   } else {
-    // 月累計モード：各項目の月累計実績に対する達成率の平均
     avgRate = currentItems.length
       ? Math.round(
           currentItems.reduce((sum, it) => {
@@ -676,37 +668,52 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
                       <span className="text-[#8B949E]">
                         目標: <strong className="text-[#C9D1D9]">{it.target}</strong> {it.unit}
                       </span>
-                      {viewMode === "month" && (
-                        <div className="text-[10px] text-[#F2B04B] font-semibold mt-0.5">
-                          今月累計: {monthlyTotals[it.id] || 0} {it.unit}
-                        </div>
-                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <input
-                      value={actual}
-                      onChange={(e) =>
-                        setAchievements({
-                          ...achievements,
-                          [it.id]: { actual: e.target.value.replace(/[^0-9.]/g, "") },
-                        })
-                      }
-                      inputMode="decimal"
-                      placeholder="0"
-                      className="w-16 bg-[#0D1117] border border-[#30363D] rounded-lg px-2 py-1.5 text-xs text-center font-bold text-[#F0F6FC] focus:outline-none focus:border-[#F2B04B]"
-                    />
-                    <span className="text-xs text-[#8B949E] shrink-0">{it.unit}</span>
-                    <div className="flex-1 h-2 bg-[#21262D] rounded-full overflow-hidden border border-[#30363D]/40">
-                      <div
-                        className="h-full bg-[#F2B04B] transition-all duration-300"
-                        style={{ width: `${rate}%` }}
+
+                  {viewMode === "week" ? (
+                    // 週の達成率モード：入力欄を表示
+                    <div className="flex items-center gap-3">
+                      <input
+                        value={actual}
+                        onChange={(e) =>
+                          setAchievements({
+                            ...achievements,
+                            [it.id]: { actual: e.target.value.replace(/[^0-9.]/g, "") },
+                          })
+                        }
+                        inputMode="decimal"
+                        placeholder="0"
+                        className="w-16 bg-[#0D1117] border border-[#30363D] rounded-lg px-2 py-1.5 text-xs text-center font-bold text-[#F0F6FC] focus:outline-none focus:border-[#F2B04B]"
                       />
+                      <span className="text-xs text-[#8B949E] shrink-0">{it.unit}</span>
+                      <div className="flex-1 h-2 bg-[#21262D] rounded-full overflow-hidden border border-[#30363D]/40">
+                        <div
+                          className="h-full bg-[#F2B04B] transition-all duration-300"
+                          style={{ width: `${rate}%` }}
+                        />
+                      </div>
+                      <span className="text-xs w-10 text-right tabular-nums font-semibold text-[#8B949E]">
+                        {rate}%
+                      </span>
                     </div>
-                    <span className="text-xs w-10 text-right tabular-nums font-semibold text-[#8B949E]">
-                      {rate}%
-                    </span>
-                  </div>
+                  ) : (
+                    // 月の達成率モード（累計）：入力欄をなくして累計結果のみをすっきり表示
+                    <div className="flex items-center gap-3 pt-1">
+                      <div className="text-xs text-[#F2B04B] font-bold shrink-0">
+                        月間累計: <span className="text-sm">{monthlyTotals[it.id] || 0}</span> {it.unit}
+                      </div>
+                      <div className="flex-1 h-2 bg-[#21262D] rounded-full overflow-hidden border border-[#30363D]/40">
+                        <div
+                          className="h-full bg-[#F2B04B] transition-all duration-300"
+                          style={{ width: `${rate}%` }}
+                        />
+                      </div>
+                      <span className="text-xs w-10 text-right tabular-nums font-semibold text-[#8B949E]">
+                        {rate}%
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })}
