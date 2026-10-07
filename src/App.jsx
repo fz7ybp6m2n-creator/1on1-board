@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Component } from "react";
-import { Calendar, Save, Plus, X } from "lucide-react";
+import { Calendar, Save, Plus, X, Users, FileText, BarChart2 } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -64,7 +64,7 @@ function getAdjustedMonth(weekStr) {
   return m;
 }
 
-// ================= SHEET TAB =================
+// ================= 1. SHEET TAB (1on1シート) =================
 export function SheetTab({
   members = [],
   selectedMemberId,
@@ -132,9 +132,7 @@ export function SheetTab({
           }
         }
       } catch (e) {
-        if (!ignore) {
-          console.error("レコードの取得に失敗しました:", e);
-        }
+        if (!ignore) console.error("レコードの取得に失敗しました:", e);
       } finally {
         if (!ignore) {
           setLoadingRecord(false);
@@ -569,7 +567,7 @@ export function SheetTab({
   );
 }
 
-// ================= HISTORY TAB =================
+// ================= 2. HISTORY TAB (履歴・グラフ) =================
 export function HistoryTab({
   members = [],
   selectedMemberId,
@@ -595,13 +593,9 @@ export function HistoryTab({
           setRecords(Array.isArray(data) ? data : []);
         }
       } catch (e) {
-        if (!ignore) {
-          console.error("履歴データの取得に失敗しました:", e);
-        }
+        if (!ignore) console.error("履歴データの取得に失敗しました:", e);
       } finally {
-        if (!ignore) {
-          setLoading(false);
-        }
+        if (!ignore) setLoading(false);
       }
     })();
 
@@ -806,5 +800,288 @@ export function HistoryTab({
         )}
       </div>
     </ErrorBoundary>
+  );
+}
+
+// ================= 3. MEMBERS TAB (メンバー設定) =================
+export function MembersTab({ members = [], setMembers, GAS_API_URL }) {
+  const [name, setName] = useState("");
+  const [items, setItems] = useState([
+    { id: "item_1", label: "", target: "", unit: "" }
+  ]);
+  const [saving, setSaving] = useState(false);
+
+  const handleItemChange = (index, field, value) => {
+    const updated = [...items];
+    updated[index][field] = value;
+    setItems(updated);
+  };
+
+  const handleAddItem = () => {
+    setItems([
+      ...items,
+      { id: `item_${Date.now()}`, label: "", target: "", unit: "" }
+    ]);
+  };
+
+  const handleRemoveItem = (index) => {
+    if (items.length === 1) return;
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const handleAddMember = async () => {
+    if (!name.trim()) {
+      alert("メンバー名を入力してください");
+      return;
+    }
+
+    const validItems = items.filter((it) => it.label.trim() !== "");
+    if (validItems.length === 0) {
+      alert("少なくとも1つの目標項目を設定してください");
+      return;
+    }
+
+    const newMember = {
+      id: `mem_${Date.now()}`,
+      name: name.trim(),
+      items: validItems
+    };
+
+    setSaving(true);
+    try {
+      if (GAS_API_URL) {
+        await fetch(GAS_API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({
+            action: "saveMember",
+            payload: newMember
+          })
+        });
+      }
+      if (typeof setMembers === "function") {
+        setMembers([...members, newMember]);
+      }
+      setName("");
+      setItems([{ id: "item_1", label: "", target: "", unit: "" }]);
+      alert("メンバーを追加しました");
+    } catch (e) {
+      console.error(e);
+      alert("メンバーの保存に失敗しました");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <ErrorBoundary>
+      <div className="pt-5 space-y-6">
+        <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-4 space-y-4 shadow-sm">
+          <h3 className="text-xs font-bold text-[#F2B04B] uppercase tracking-wider">
+            新規メンバー登録
+          </h3>
+
+          <div>
+            <label className="text-xs text-[#8B949E] block mb-1">メンバー名</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="例: 熊谷 啓"
+              className="w-full bg-[#0D1117] border border-[#30363D] rounded-lg px-3 py-2 text-xs text-[#F0F6FC] focus:outline-none focus:border-[#F2B04B]"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs text-[#8B949E] block">目標項目の設定</label>
+            {items.map((item, idx) => (
+              <div key={item.id} className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={item.label}
+                  onChange={(e) => handleItemChange(idx, "label", e.target.value)}
+                  placeholder="項目名（例: 物件動画）"
+                  className="flex-2 bg-[#0D1117] border border-[#30363D] rounded-lg px-2.5 py-1.5 text-xs text-[#F0F6FC] focus:outline-none focus:border-[#F2B04B]"
+                />
+                <input
+                  type="number"
+                  value={item.target}
+                  onChange={(e) => handleItemChange(idx, "target", e.target.value)}
+                  placeholder="目標数"
+                  className="w-16 bg-[#0D1117] border border-[#30363D] rounded-lg px-2 py-1.5 text-xs text-[#F0F6FC] focus:outline-none focus:border-[#F2B04B]"
+                />
+                <input
+                  type="text"
+                  value={item.unit}
+                  onChange={(e) => handleItemChange(idx, "unit", e.target.value)}
+                  placeholder="単位"
+                  className="w-14 bg-[#0D1117] border border-[#30363D] rounded-lg px-2 py-1.5 text-xs text-[#F0F6FC] focus:outline-none focus:border-[#F2B04B]"
+                />
+                {items.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveItem(idx)}
+                    className="p-1 text-[#6E7681] hover:text-[#FF8585]"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={handleAddItem}
+              className="text-xs text-[#F2B04B] hover:underline flex items-center gap-1 font-semibold pt-1"
+            >
+              <Plus size={14} /> 項目を追加
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleAddMember}
+            disabled={saving}
+            className="w-full bg-[#238636] hover:bg-[#2EA043] text-white font-bold text-xs rounded-lg py-2.5 transition-all shadow-sm"
+          >
+            {saving ? "登録中..." : "メンバーを保存"}
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-xs font-bold text-[#8B949E]">登録済みメンバー一覧</h3>
+          {members.length === 0 ? (
+            <div className="text-xs text-[#8B949E] text-center py-6 bg-[#161B22]/50 border border-[#30363D] rounded-xl">
+              まだメンバーが登録されていません
+            </div>
+          ) : (
+            members.map((m) => (
+              <div
+                key={m.id}
+                className="bg-[#161B22] border border-[#30363D] rounded-xl p-3.5 space-y-2"
+              >
+                <div className="text-xs font-bold text-[#F0F6FC]">{m.name}</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {m.items?.map((it) => (
+                    <span
+                      key={it.id}
+                      className="text-[11px] bg-[#0D1117] border border-[#30363D] text-[#8B949E] px-2 py-0.5 rounded-md"
+                    >
+                      {it.label}: {it.target} {it.unit}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </ErrorBoundary>
+  );
+}
+
+// ================= 4. MAIN APP COMPONENT =================
+const MOCK_MEMBERS = [
+  {
+    id: "mem_1",
+    name: "熊谷 啓",
+    items: [
+      { id: "item_1", label: "物件動画投稿数", target: 3, unit: "本" },
+      { id: "item_2", label: "LINE問合せ対応数", target: 10, unit: "件" },
+      { id: "item_3", label: "契約獲得数", target: 2, unit: "件" }
+    ]
+  }
+];
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState("sheet"); // "sheet" | "history" | "members"
+  const [members, setMembers] = useState(MOCK_MEMBERS);
+  const [selectedMemberId, setSelectedMemberId] = useState("mem_1");
+
+  const GAS_API_URL = "https://script.google.com/macros/s/YOUR_GAS_DEPLOYMENT_ID/exec";
+
+  const getCurrentWeekLabel = () => {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const date = now.getDate();
+    return `${month}/${date}週`;
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0D1117] text-[#F0F6FC] font-sans antialiased pb-12">
+      <div className="max-w-md mx-auto px-4">
+        {/* ヘッダー */}
+        <header className="pt-6 pb-4 border-b border-[#30363D]">
+          <h1 className="text-lg font-bold text-[#F2B04B]">1on1 ミーティングシート</h1>
+          <p className="text-xs text-[#8B949E] mt-0.5">目標進捗・アクション管理</p>
+        </header>
+
+        {/* タブ切替 */}
+        <div className="flex border-b border-[#30363D] mt-4">
+          <button
+            onClick={() => setActiveTab("sheet")}
+            className={`flex-1 py-2.5 text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === "sheet"
+                ? "border-[#F2B04B] text-[#F2B04B]"
+                : "border-transparent text-[#8B949E] hover:text-[#C9D1D9]"
+            }`}
+          >
+            <FileText size={14} />
+            1on1シート
+          </button>
+          <button
+            onClick={() => setActiveTab("history")}
+            className={`flex-1 py-2.5 text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === "history"
+                ? "border-[#F2B04B] text-[#F2B04B]"
+                : "border-transparent text-[#8B949E] hover:text-[#C9D1D9]"
+            }`}
+          >
+            <BarChart2 size={14} />
+            履歴・グラフ
+          </button>
+          <button
+            onClick={() => setActiveTab("members")}
+            className={`flex-1 py-2.5 text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === "members"
+                ? "border-[#F2B04B] text-[#F2B04B]"
+                : "border-transparent text-[#8B949E] hover:text-[#C9D1D9]"
+            }`}
+          >
+            <Users size={14} />
+            メンバー設定
+          </button>
+        </div>
+
+        {/* タブコンテンツ */}
+        <main>
+          {activeTab === "sheet" && (
+            <SheetTab
+              members={members}
+              selectedMemberId={selectedMemberId}
+              setSelectedMemberId={setSelectedMemberId}
+              GAS_API_URL={GAS_API_URL}
+              currentWeekLabel={getCurrentWeekLabel}
+            />
+          )}
+
+          {activeTab === "history" && (
+            <HistoryTab
+              members={members}
+              selectedMemberId={selectedMemberId}
+              setSelectedMemberId={setSelectedMemberId}
+              GAS_API_URL={GAS_API_URL}
+            />
+          )}
+
+          {activeTab === "members" && (
+            <MembersTab
+              members={members}
+              setMembers={setMembers}
+              GAS_API_URL={GAS_API_URL}
+            />
+          )}
+        </main>
+      </div>
+    </div>
   );
 }
