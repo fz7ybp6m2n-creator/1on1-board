@@ -345,7 +345,7 @@ function MemberCard({ member, expanded, onToggle, onRemove, onUpdate }) {
   );
 }
 
-// // ================= SHEET TAB =================
+// ================= SHEET TAB =================
 function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
   const [week, setWeek] = useState(currentWeekLabel());
   const [viewMode, setViewMode] = useState("week");
@@ -358,9 +358,6 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
   const [loadingRecord, setLoadingRecord] = useState(false);
   const [records, setRecords] = useState([]);
 
-  // カレンダー選択用のRef
-  const dateInputRef = useRef(null);
-
   const member = members.find((m) => m.id === selectedMemberId);
 
   // カレンダーで日付が選択された時の処理（YYYY-MM-DD -> M/D週）
@@ -372,17 +369,6 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
       const m = dateObj.getMonth() + 1;
       const d = dateObj.getDate();
       setWeek(`${m}/${d}週`);
-    }
-  };
-
-  // カレンダーアイコンをクリックした時に標準DatePickerを開く
-  const openDatePicker = () => {
-    if (dateInputRef.current) {
-      if (typeof dateInputRef.current.showPicker === "function") {
-        dateInputRef.current.showPicker();
-      } else {
-        dateInputRef.current.click();
-      }
     }
   };
 
@@ -558,28 +544,21 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
         ))}
       </div>
       
-      {/* 対象週設定バー */}
+      {/* 対象週設定バー（labelでラップしてアイコンクリックでカレンダーが開くようにする） */}
       <div className="flex items-center gap-2.5 bg-[#161B22] border border-[#30363D] rounded-xl px-3.5 py-2.5 text-xs text-[#C9D1D9]">
-        <button
-          type="button"
-          onClick={openDatePicker}
-          title="カレンダーから日付を選択"
-          className="p-1 -m-1 text-[#8B949E] hover:text-[#F2B04B] transition-colors cursor-pointer rounded-md focus:outline-none"
-        >
+        <label className="cursor-pointer p-1 -m-1 text-[#8B949E] hover:text-[#F2B04B] transition-colors flex items-center">
           <Calendar size={16} />
-        </button>
+          <input
+            type="date"
+            onChange={handleDateChange}
+            className="sr-only absolute opacity-0 pointer-events-none"
+          />
+        </label>
         <span className="text-[#8B949E] shrink-0">対象週:</span>
         <input
           value={week}
           onChange={(e) => setWeek(e.target.value)}
           className="bg-transparent flex-1 text-xs font-semibold text-[#F0F6FC] focus:outline-none"
-        />
-        {/* 隠し日付入力フィールド */}
-        <input
-          type="date"
-          ref={dateInputRef}
-          onChange={handleDateChange}
-          className="sr-only hidden"
         />
       </div>
       
