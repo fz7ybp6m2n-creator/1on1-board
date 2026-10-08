@@ -461,7 +461,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
       ? Math.round(
           currentItems.reduce((sum, it) => {
             const actual = Number(achievements[it.id]?.actual ?? 0);
-            return sum + Math.min(100, (actual / it.target) * 100 || 0);
+            return sum + ((actual / it.target) * 100 || 0);
           }, 0) / currentItems.length
         )
       : 0;
@@ -471,7 +471,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
       ? Math.round(
           currentItems.reduce((sum, it) => {
             const totalActual = monthlyTotals[it.id] || 0;
-            return sum + Math.min(100, (totalActual / it.target) * 100 || 0);
+            return sum + ((totalActual / it.target) * 100 || 0);
           }, 0) / currentItems.length
         )
       : 0;
@@ -667,10 +667,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
             {member.items.map((it) => {
               const actual = achievements[it.id]?.actual ?? "";
               const valForCalc = viewMode === "week" ? Number(actual) || 0 : monthlyTotals[it.id] || 0;
-              const rate = Math.min(
-                100,
-                Math.round((valForCalc / it.target) * 100)
-              );
+              const rate = it.target > 0 ? Math.round((valForCalc / it.target) * 100) : 0;
 
               return (
                 <div
