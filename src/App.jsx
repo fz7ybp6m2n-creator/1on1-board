@@ -155,158 +155,195 @@ function BottomNav({ tab, setTab }) {
   );
 }
 
-
 // ================= MEMBERS TAB =================
 function MembersTab({ members, setMembers }) {
-  const [name, setName] = useState("");
-  const [items, setItems] = useState([{ label: "", target: "", unit: "" }]);
+  const [expandedId, setExpandedId] = useState(null);
+  const [newName, setNewName] = useState("");
 
-  const addItemField = () => {
-    setItems([...items, { label: "", target: "", unit: "" }]);
+  const addMember = () => {
+    const name = newName.trim();
+    if (!name) return;
+    const m = { id: uid(), name, items: [] };
+    setMembers([...members, m]);
+    setNewName("");
+    setExpandedId(m.id);
   };
 
-  const removeItemField = (index) => {
-    setItems(items.filter((_, i) => i !== index));
-  };
-
-  const updateItem = (index, field, value) => {
-    const newItems = [...items];
-    newItems[index][field] = value;
-    setItems(newItems);
-  };
-
-  const handleAddMember = async () => {
-    if (!name.trim()) {
-      alert("メンバー名を入力してください");
-      return;
+  const removeMember = async (id) => {
+    setMembers(members.filter((m) => m.id !== id));
+    try {
+      await fetch(GAS_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          action: "deleteMember",
+          payload: { id: id }
+        })
+      });
+    } catch (e) {
+      console.error("スプレッドシートの削除に失敗しました", e);
     }
-    const validItems = items.filter((i) => i.label.trim() && i.target);
-    if (validItems.length === 0) {
-      alert("有効な目標項目を1件以上入力してください");
-      return;
-    }
-
-    const newMember = {
-      id: "m_" + Date.now(),
-      name: name.trim(),
-      items: validItems.map((item, idx) => ({
-        id: "item_" + Date.now() + "_" + idx,
-        label: item.label,
-        target: Number(item.target),
-        unit: item.unit || "件"
-      }))
-    };
-
-    const updated = [...members, newMember];
-    setMembers(updated);
-    
-    // GAS側等へ保存処理がある場合はここに記述
-    setName("");
-    setItems([{ label: "", target: "", unit: "" }]);
-    alert("メンバーを追加しました！");
   };
 
-  const handleDeleteMember = (id) => {
-    if (!confirm("本当にこのメンバーを削除しますか？")) return;
-    const updated = members.filter((m) => m.id !== id);
-    setMembers(updated);
+  const updateMember = (id, patch) => {
+    setMembers(members.map((m) => (m.id === id ? { ...m, ...patch } : m)));
   };
 
   return (
-    <div className="pt-5 space-y-6">
-      <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-4 space-y-4">
-        <h3 className="text-xs font-bold text-[#F0F6FC] uppercase tracking-wider">新規メンバー・目標設定</h3>
-        
-        <div>
-          <label className="text-xs font-semibold text-[#8B949E] block mb-1.5">メンバー名</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="例: 山田 太郎"
-            className="w-full bg-[#0D1117] border border-[#30363D] rounded-xl px-3.5 py-2.5 text-xs text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
-          />
-        </div>
+    <div className="pt-6 space-y-5">
+      <p className="text-xs text-[#8B949E] leading-relaxed">
+        メンバーごとに追う目標項目（KPI）を登録します。データは全員共通で更新されます。
+      </p>
 
-        <div className="space-y-3">
-          <label className="text-xs font-semibold text-[#8B949E] block">追うべき目標項目</label>
-          {items.map((item, idx) => (
-            <div key={idx} className="flex gap-2 items-center bg-[#0D1117] p-2.5 rounded-xl border border-[#30363D]">
-              <input
-                value={item.label}
-                onChange={(e) => updateItem(idx, "label", e.target.value)}
-                placeholder="項目名 (例: 売上)"
-                className="flex-2 bg-[#161B22] border border-[#30363D] rounded-lg px-2.5 py-1.5 text-xs text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
-              />
-              <input
-                value={item.target}
-                onChange={(e) => updateItem(idx, "target", e.target.value.replace(/[^0-9.]/g, ""))}
-                placeholder="目標数"
-                className="w-16 bg-[#161B22] border border-[#30363D] rounded-lg px-2.5 py-1.5 text-xs text-center text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
-              />
-              <input
-                value={item.unit}
-                onChange={(e) => updateItem(idx, "unit", e.target.value)}
-                placeholder="単位"
-                className="w-16 bg-[#161B22] border border-[#30363D] rounded-lg px-2.5 py-1.5 text-xs text-center text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
-              />
-              {items.length > 1 && (
-                <button
-                  onClick={() => removeItemField(idx)}
-                  className="p-1 text-[#6E7681] hover:text-[#FF8585]"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-          ))}
-          <button
-            onClick={addItemField}
-            className="text-xs text-[#F2B04B] hover:underline flex items-center gap-1 font-semibold pt-1"
-          >
-            <Plus size={14} strokeWidth={2.5} />
-            項目を追加
-          </button>
-        </div>
-
+      <div className="flex gap-2.5">
+        <input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addMember()}
+          placeholder="メンバー名（例：田中さん）"
+          className="flex-1 bg-[#161B22] border border-[#30363D] rounded-xl px-3.5 py-2.5 text-sm text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B] focus:ring-1 focus:ring-[#F2B04B] transition-all"
+        />
         <button
-          onClick={handleAddMember}
-          className="w-full bg-[#F2B04B] hover:bg-[#E8A33D] text-[#0D1117] font-bold text-xs rounded-xl py-3 active:scale-[0.98] transition-all shadow-md mt-2"
+          onClick={addMember}
+          className="bg-[#F2B04B] hover:bg-[#E8A33D] text-[#0D1117] rounded-xl px-4 flex items-center gap-1 font-bold text-sm active:scale-95 transition-all shadow-sm"
         >
-          メンバーを登録する
+          <Plus size={16} strokeWidth={2.5} />
+          追加
         </button>
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-xs font-bold text-[#8B949E] uppercase tracking-wider">登録済みメンバー一覧</h3>
-        {members.length === 0 ? (
-          <div className="text-xs text-[#8B949E] text-center py-8 bg-[#161B22]/50 border border-[#30363D] rounded-xl">
-            メンバーが登録されていません
+        {members.map((m) => (
+          <MemberCard
+            key={m.id}
+            member={m}
+            expanded={expandedId === m.id}
+            onToggle={() => setExpandedId(expandedId === m.id ? null : m.id)}
+            onRemove={() => removeMember(m.id)}
+            onUpdate={(patch) => updateMember(m.id, patch)}
+          />
+        ))}
+        {members.length === 0 && (
+          <div className="text-center py-12 text-[#6E7681] text-xs">
+            まだメンバーが登録されていません
           </div>
-        ) : (
-          members.map((m) => (
-            <div key={m.id} className="bg-[#161B22] border border-[#30363D] rounded-xl p-4 flex justify-between items-start">
-              <div>
-                <div className="font-bold text-sm text-[#F0F6FC]">{m.name}</div>
-                <div className="text-xs text-[#8B949E] mt-1 space-y-0.5">
-                  {m.items?.map((it, i) => (
-                    <div key={i}>・{it.label}: {it.target} {it.unit}</div>
-                  ))}
-                </div>
-              </div>
-              <button
-                onClick={() => handleDeleteMember(m.id)}
-                className="text-xs text-[#6E7681] hover:text-[#FF8585] px-2 py-1"
-              >
-                削除
-              </button>
-            </div>
-          ))
         )}
       </div>
     </div>
   );
 }
 
+function MemberCard({ member, expanded, onToggle, onRemove, onUpdate }) {
+  const [label, setLabel] = useState("");
+  const [target, setTarget] = useState("");
+  const [unit, setUnit] = useState("件");
+
+  const addItem = () => {
+    if (!label.trim() || !target) return;
+    const item = { id: uid(), label: label.trim(), target: Number(target), unit };
+    onUpdate({ items: [...(member.items || []), item] });
+    setLabel("");
+    setTarget("");
+  };
+
+  const removeItem = (id) => {
+    onUpdate({ items: (member.items || []).filter((it) => it.id !== id) });
+  };
+
+  return (
+    <div className="bg-[#161B22] border border-[#30363D] rounded-xl overflow-hidden shadow-sm hover:border-[#484F58] transition-all">
+      <div className="w-full flex items-center justify-between px-4.5 py-3.5">
+        <div className="flex items-center gap-3 flex-1 mr-2">
+          <div className="w-9 h-9 rounded-full bg-[#21262D] border border-[#30363D] flex items-center justify-center text-xs font-bold text-[#F2B04B] shrink-0">
+            {member.name ? member.name.slice(0, 1) : "？"}
+          </div>
+          <div className="flex-1">
+            {/* 名前を直接編集できるようにinput化 */}
+            <input
+              type="text"
+              value={member.name}
+              onChange={(e) => onUpdate({ name: e.target.value })}
+              placeholder="メンバー名"
+              className="bg-[#0D1117] border border-[#30363D] rounded-lg px-2.5 py-1 text-sm font-semibold text-[#F0F6FC] focus:outline-none focus:border-[#F2B04B] w-full max-w-[180px]"
+            />
+            <div className="text-[11px] text-[#8B949E] mt-0.5 pl-0.5">
+              目標項目：{(member.items || []).length}件
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={onToggle}
+          className="p-2 hover:bg-[#21262D] rounded-lg transition-colors"
+        >
+          <ChevronRight
+            size={18}
+            className={`text-[#6E7681] transition-transform duration-200 ${expanded ? "rotate-90 text-[#F2B04B]" : ""}`}
+          />
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="px-4.5 pb-4 border-t border-[#30363D]/60 pt-3.5 space-y-3 bg-[#0D1117]/40">
+          {(member.items || []).map((it) => (
+            <div
+              key={it.id}
+              className="flex items-center justify-between bg-[#21262D] border border-[#30363D] rounded-lg px-3 py-2 text-xs"
+            >
+              <span className="font-medium text-[#C9D1D9]">
+                {it.label}{" "}
+                <span className="text-[#8B949E] ml-1 font-normal">
+                  (目標: {it.target}{it.unit}/週)
+                </span>
+              </span>
+              <button onClick={() => removeItem(it.id)} className="p-1 text-[#8B949E] hover:text-[#FF8585] transition-colors">
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+
+          <div className="w-full overflow-x-auto pt-1 pb-1 scrollbar-none">
+            <div className="grid grid-cols-[1fr_75px_60px_36px] gap-2 items-center min-w-[340px]">
+              <input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="項目名（例：紹介数）"
+                className="bg-[#21262D] border border-[#30363D] rounded-lg px-2.5 py-2 text-xs placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
+              />
+              <input
+                value={target}
+                onChange={(e) => setTarget(e.target.value.replace(/[^0-9.]/g, ""))}
+                placeholder="目標"
+                inputMode="decimal"
+                className="bg-[#21262D] border border-[#30363D] rounded-lg px-2.5 py-2 text-xs text-center placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
+              />
+              <input
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                className="bg-[#21262D] border border-[#30363D] rounded-lg px-2.5 py-2 text-xs text-center focus:outline-none focus:border-[#F2B04B]"
+              />
+              <button
+                onClick={addItem}
+                className="bg-[#30363D] hover:bg-[#484F58] border border-[#484F58] rounded-lg h-full flex items-center justify-center active:scale-95 transition-all"
+              >
+                <Plus size={15} className="text-[#F2B04B]" />
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-2 flex justify-end">
+            <button
+              onClick={onRemove}
+              className="text-[11px] text-[#FF8585] hover:underline flex items-center gap-1 opacity-80 hover:opacity-100 transition-opacity"
+            >
+              <Trash2 size={12} /> このメンバーを削除
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 // ================= SHEET TAB =================
 function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
   const [week, setWeek] = useState(currentWeekLabel());
