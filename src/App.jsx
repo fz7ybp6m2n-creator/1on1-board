@@ -344,6 +344,7 @@ function MemberCard({ member, expanded, onToggle, onRemove, onUpdate }) {
     </div>
   );
 }
+
 // ================= SHEET TAB =================
 function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
   const [week, setWeek] = useState(currentWeekLabel());
@@ -357,33 +358,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
   const [loadingRecord, setLoadingRecord] = useState(false);
   const [records, setRecords] = useState([]);
 
-  // React.useRef を使用してエラーを回避
-  const dateInputRef = React.useRef(null);
-
   const member = members.find((m) => m.id === selectedMemberId);
-
-  // カレンダーで日付が選択された時の処理（YYYY-MM-DD -> M/D週）
-  const handleDateChange = (e) => {
-    const val = e.target.value;
-    if (!val) return;
-    const dateObj = new Date(val);
-    if (!isNaN(dateObj.getTime())) {
-      const m = dateObj.getMonth() + 1;
-      const d = dateObj.getDate();
-      setWeek(`${m}/${d}週`);
-    }
-  };
-
-  // アイコンクリック時にカレンダーを強制オープン
-  const openDatePicker = () => {
-    if (dateInputRef.current) {
-      if (typeof dateInputRef.current.showPicker === "function") {
-        dateInputRef.current.showPicker();
-      } else {
-        dateInputRef.current.click();
-      }
-    }
-  };
 
   useEffect(() => {
     if (!member) return;
@@ -486,16 +461,17 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
       ? Math.round(
           currentItems.reduce((sum, it) => {
             const actual = Number(achievements[it.id]?.actual ?? 0);
-            return sum + (it.target > 0 ? (actual / it.target) * 100 : 0);
+            return sum + ((actual / it.target) * 100 || 0);
           }, 0) / currentItems.length
         )
       : 0;
   } else {
+    // 月累計モード：各項目の月累計実績に対する達成率の平均
     avgRate = currentItems.length
       ? Math.round(
           currentItems.reduce((sum, it) => {
             const totalActual = monthlyTotals[it.id] || 0;
-            return sum + (it.target > 0 ? (totalActual / it.target) * 100 : 0);
+            return sum + ((totalActual / it.target) * 100 || 0);
           }, 0) / currentItems.length
         )
       : 0;
@@ -556,26 +532,9 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
         ))}
       </div>
       
-      {/* 対象週設定バー */}
-      <div className="flex items-center gap-2.5 bg-[#161B22] border border-[#30363D] rounded-xl px-3.5 py-2.5 text-xs text-[#C9D1D9] relative">
-        <button
-          type="button"
-          onClick={openDatePicker}
-          className="p-1 -m-1 text-[#8B949E] hover:text-[#F2B04B] transition-colors cursor-pointer rounded-md focus:outline-none flex items-center justify-center"
-          title="カレンダーから日付を選択"
-        >
-          <Calendar size={16} />
-        </button>
-
-        {/* 隠し日付入力フィールド（クリック時に showPicker を発火） */}
-        <input
-          type="date"
-          ref={dateInputRef}
-          onChange={handleDateChange}
-          className="absolute opacity-0 pointer-events-none w-0 h-0"
-        />
-
-        <span className="text-[#8B949E] shrink-0">対象週:</span>
+      <div className="flex items-center gap-2.5 bg-[#161B22] border border-[#30363D] rounded-xl px-3.5 py-2.5 text-xs text-[#C9D1D9]">
+        <Calendar size={15} className="text-[#8B949E] shrink-0" />
+        <span className="text-[#8B949E]">対象週:</span>
         <input
           value={week}
           onChange={(e) => setWeek(e.target.value)}
@@ -754,7 +713,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
                     <div className="flex-1 h-2 bg-[#21262D] rounded-full overflow-hidden border border-[#30363D]/40">
                       <div
                         className="h-full bg-[#F2B04B] transition-all duration-300"
-                        style={{ width: `${Math.min(rate, 100)}%` }}
+                        style={{ width: `${rate}%` }}
                       />
                     </div>
                     <span className="text-xs w-10 text-right tabular-nums font-semibold text-[#8B949E]">
@@ -870,6 +829,7 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
     </div>
   );
 }
+
 // ================= HISTORY TAB =================
 function HistoryTab({ members, selectedMemberId, setSelectedMemberId }) {
   const [records, setRecords] = useState([]);
