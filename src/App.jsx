@@ -155,6 +155,158 @@ function BottomNav({ tab, setTab }) {
   );
 }
 
+
+// ================= MEMBERS TAB =================
+function MembersTab({ members, setMembers }) {
+  const [name, setName] = useState("");
+  const [items, setItems] = useState([{ label: "", target: "", unit: "" }]);
+
+  const addItemField = () => {
+    setItems([...items, { label: "", target: "", unit: "" }]);
+  };
+
+  const removeItemField = (index) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const updateItem = (index, field, value) => {
+    const newItems = [...items];
+    newItems[index][field] = value;
+    setItems(newItems);
+  };
+
+  const handleAddMember = async () => {
+    if (!name.trim()) {
+      alert("メンバー名を入力してください");
+      return;
+    }
+    const validItems = items.filter((i) => i.label.trim() && i.target);
+    if (validItems.length === 0) {
+      alert("有効な目標項目を1件以上入力してください");
+      return;
+    }
+
+    const newMember = {
+      id: "m_" + Date.now(),
+      name: name.trim(),
+      items: validItems.map((item, idx) => ({
+        id: "item_" + Date.now() + "_" + idx,
+        label: item.label,
+        target: Number(item.target),
+        unit: item.unit || "件"
+      }))
+    };
+
+    const updated = [...members, newMember];
+    setMembers(updated);
+    
+    // GAS側等へ保存処理がある場合はここに記述
+    setName("");
+    setItems([{ label: "", target: "", unit: "" }]);
+    alert("メンバーを追加しました！");
+  };
+
+  const handleDeleteMember = (id) => {
+    if (!confirm("本当にこのメンバーを削除しますか？")) return;
+    const updated = members.filter((m) => m.id !== id);
+    setMembers(updated);
+  };
+
+  return (
+    <div className="pt-5 space-y-6">
+      <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-4 space-y-4">
+        <h3 className="text-xs font-bold text-[#F0F6FC] uppercase tracking-wider">新規メンバー・目標設定</h3>
+        
+        <div>
+          <label className="text-xs font-semibold text-[#8B949E] block mb-1.5">メンバー名</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="例: 山田 太郎"
+            className="w-full bg-[#0D1117] border border-[#30363D] rounded-xl px-3.5 py-2.5 text-xs text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
+          />
+        </div>
+
+        <div className="space-y-3">
+          <label className="text-xs font-semibold text-[#8B949E] block">追うべき目標項目</label>
+          {items.map((item, idx) => (
+            <div key={idx} className="flex gap-2 items-center bg-[#0D1117] p-2.5 rounded-xl border border-[#30363D]">
+              <input
+                value={item.label}
+                onChange={(e) => updateItem(idx, "label", e.target.value)}
+                placeholder="項目名 (例: 売上)"
+                className="flex-2 bg-[#161B22] border border-[#30363D] rounded-lg px-2.5 py-1.5 text-xs text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
+              />
+              <input
+                value={item.target}
+                onChange={(e) => updateItem(idx, "target", e.target.value.replace(/[^0-9.]/g, ""))}
+                placeholder="目標数"
+                className="w-16 bg-[#161B22] border border-[#30363D] rounded-lg px-2.5 py-1.5 text-xs text-center text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
+              />
+              <input
+                value={item.unit}
+                onChange={(e) => updateItem(idx, "unit", e.target.value)}
+                placeholder="単位"
+                className="w-16 bg-[#161B22] border border-[#30363D] rounded-lg px-2.5 py-1.5 text-xs text-center text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
+              />
+              {items.length > 1 && (
+                <button
+                  onClick={() => removeItemField(idx)}
+                  className="p-1 text-[#6E7681] hover:text-[#FF8585]"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          ))}
+          <button
+            onClick={addItemField}
+            className="text-xs text-[#F2B04B] hover:underline flex items-center gap-1 font-semibold pt-1"
+          >
+            <Plus size={14} strokeWidth={2.5} />
+            項目を追加
+          </button>
+        </div>
+
+        <button
+          onClick={handleAddMember}
+          className="w-full bg-[#F2B04B] hover:bg-[#E8A33D] text-[#0D1117] font-bold text-xs rounded-xl py-3 active:scale-[0.98] transition-all shadow-md mt-2"
+        >
+          メンバーを登録する
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-xs font-bold text-[#8B949E] uppercase tracking-wider">登録済みメンバー一覧</h3>
+        {members.length === 0 ? (
+          <div className="text-xs text-[#8B949E] text-center py-8 bg-[#161B22]/50 border border-[#30363D] rounded-xl">
+            メンバーが登録されていません
+          </div>
+        ) : (
+          members.map((m) => (
+            <div key={m.id} className="bg-[#161B22] border border-[#30363D] rounded-xl p-4 flex justify-between items-start">
+              <div>
+                <div className="font-bold text-sm text-[#F0F6FC]">{m.name}</div>
+                <div className="text-xs text-[#8B949E] mt-1 space-y-0.5">
+                  {m.items?.map((it, i) => (
+                    <div key={i}>・{it.label}: {it.target} {it.unit}</div>
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={() => handleDeleteMember(m.id)}
+                className="text-xs text-[#6E7681] hover:text-[#FF8585] px-2 py-1"
+              >
+                削除
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ================= SHEET TAB =================
 function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
   const [week, setWeek] = useState(currentWeekLabel());
