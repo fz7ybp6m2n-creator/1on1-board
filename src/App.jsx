@@ -155,196 +155,6 @@ function BottomNav({ tab, setTab }) {
   );
 }
 
-// ================= MEMBERS TAB =================
-function MembersTab({ members, setMembers }) {
-  const [expandedId, setExpandedId] = useState(null);
-  const [newName, setNewName] = useState("");
-
-  const addMember = () => {
-    const name = newName.trim();
-    if (!name) return;
-    const m = { id: uid(), name, items: [] };
-    setMembers([...members, m]);
-    setNewName("");
-    setExpandedId(m.id);
-  };
-
-  const removeMember = async (id) => {
-    setMembers(members.filter((m) => m.id !== id));
-    try {
-      await fetch(GAS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({
-          action: "deleteMember",
-          payload: { id: id }
-        })
-      });
-    } catch (e) {
-      console.error("スプレッドシートの削除に失敗しました", e);
-    }
-  };
-
-  const updateMember = (id, patch) => {
-    setMembers(members.map((m) => (m.id === id ? { ...m, ...patch } : m)));
-  };
-
-  return (
-    <div className="pt-6 space-y-5">
-      <p className="text-xs text-[#8B949E] leading-relaxed">
-        メンバーごとに追う目標項目（KPI）を登録します。データは全員共通で更新されます。
-      </p>
-
-      <div className="flex gap-2.5">
-        <input
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && addMember()}
-          placeholder="メンバー名（例：田中さん）"
-          className="flex-1 bg-[#161B22] border border-[#30363D] rounded-xl px-3.5 py-2.5 text-sm text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B] focus:ring-1 focus:ring-[#F2B04B] transition-all"
-        />
-        <button
-          onClick={addMember}
-          className="bg-[#F2B04B] hover:bg-[#E8A33D] text-[#0D1117] rounded-xl px-4 flex items-center gap-1 font-bold text-sm active:scale-95 transition-all shadow-sm"
-        >
-          <Plus size={16} strokeWidth={2.5} />
-          追加
-        </button>
-      </div>
-
-      <div className="space-y-3">
-        {members.map((m) => (
-          <MemberCard
-            key={m.id}
-            member={m}
-            expanded={expandedId === m.id}
-            onToggle={() => setExpandedId(expandedId === m.id ? null : m.id)}
-            onRemove={() => removeMember(m.id)}
-            onUpdate={(patch) => updateMember(m.id, patch)}
-          />
-        ))}
-        {members.length === 0 && (
-          <div className="text-center py-12 text-[#6E7681] text-xs">
-            まだメンバーが登録されていません
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function MemberCard({ member, expanded, onToggle, onRemove, onUpdate }) {
-  const [label, setLabel] = useState("");
-  const [target, setTarget] = useState("");
-  const [unit, setUnit] = useState("件");
-
-  const addItem = () => {
-    if (!label.trim() || !target) return;
-    const item = { id: uid(), label: label.trim(), target: Number(target), unit };
-    onUpdate({ items: [...(member.items || []), item] });
-    setLabel("");
-    setTarget("");
-  };
-
-  const removeItem = (id) => {
-    onUpdate({ items: (member.items || []).filter((it) => it.id !== id) });
-  };
-
-  return (
-    <div className="bg-[#161B22] border border-[#30363D] rounded-xl overflow-hidden shadow-sm hover:border-[#484F58] transition-all">
-      <div className="w-full flex items-center justify-between px-4.5 py-3.5">
-        <div className="flex items-center gap-3 flex-1 mr-2">
-          <div className="w-9 h-9 rounded-full bg-[#21262D] border border-[#30363D] flex items-center justify-center text-xs font-bold text-[#F2B04B] shrink-0">
-            {member.name ? member.name.slice(0, 1) : "？"}
-          </div>
-          <div className="flex-1">
-            {/* 名前を直接編集できるようにinput化 */}
-            <input
-              type="text"
-              value={member.name}
-              onChange={(e) => onUpdate({ name: e.target.value })}
-              placeholder="メンバー名"
-              className="bg-[#0D1117] border border-[#30363D] rounded-lg px-2.5 py-1 text-sm font-semibold text-[#F0F6FC] focus:outline-none focus:border-[#F2B04B] w-full max-w-[180px]"
-            />
-            <div className="text-[11px] text-[#8B949E] mt-0.5 pl-0.5">
-              目標項目：{(member.items || []).length}件
-            </div>
-          </div>
-        </div>
-
-        <button
-          onClick={onToggle}
-          className="p-2 hover:bg-[#21262D] rounded-lg transition-colors"
-        >
-          <ChevronRight
-            size={18}
-            className={`text-[#6E7681] transition-transform duration-200 ${expanded ? "rotate-90 text-[#F2B04B]" : ""}`}
-          />
-        </button>
-      </div>
-
-      {expanded && (
-        <div className="px-4.5 pb-4 border-t border-[#30363D]/60 pt-3.5 space-y-3 bg-[#0D1117]/40">
-          {(member.items || []).map((it) => (
-            <div
-              key={it.id}
-              className="flex items-center justify-between bg-[#21262D] border border-[#30363D] rounded-lg px-3 py-2 text-xs"
-            >
-              <span className="font-medium text-[#C9D1D9]">
-                {it.label}{" "}
-                <span className="text-[#8B949E] ml-1 font-normal">
-                  (目標: {it.target}{it.unit}/週)
-                </span>
-              </span>
-              <button onClick={() => removeItem(it.id)} className="p-1 text-[#8B949E] hover:text-[#FF8585] transition-colors">
-                <Trash2 size={13} />
-              </button>
-            </div>
-          ))}
-
-          <div className="w-full overflow-x-auto pt-1 pb-1 scrollbar-none">
-            <div className="grid grid-cols-[1fr_75px_60px_36px] gap-2 items-center min-w-[340px]">
-              <input
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="項目名（例：紹介数）"
-                className="bg-[#21262D] border border-[#30363D] rounded-lg px-2.5 py-2 text-xs placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
-              />
-              <input
-                value={target}
-                onChange={(e) => setTarget(e.target.value.replace(/[^0-9.]/g, ""))}
-                placeholder="目標"
-                inputMode="decimal"
-                className="bg-[#21262D] border border-[#30363D] rounded-lg px-2.5 py-2 text-xs text-center placeholder-[#6E7681] focus:outline-none focus:border-[#F2B04B]"
-              />
-              <input
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-                className="bg-[#21262D] border border-[#30363D] rounded-lg px-2.5 py-2 text-xs text-center focus:outline-none focus:border-[#F2B04B]"
-              />
-              <button
-                onClick={addItem}
-                className="bg-[#30363D] hover:bg-[#484F58] border border-[#484F58] rounded-lg h-full flex items-center justify-center active:scale-95 transition-all"
-              >
-                <Plus size={15} className="text-[#F2B04B]" />
-              </button>
-            </div>
-          </div>
-
-          <div className="pt-2 flex justify-end">
-            <button
-              onClick={onRemove}
-              className="text-[11px] text-[#FF8585] hover:underline flex items-center gap-1 opacity-80 hover:opacity-100 transition-opacity"
-            >
-              <Trash2 size={12} /> このメンバーを削除
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ================= SHEET TAB =================
 function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
   const [week, setWeek] = useState(currentWeekLabel());
@@ -358,17 +168,31 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
   const [loadingRecord, setLoadingRecord] = useState(false);
   const [records, setRecords] = useState([]);
 
+  // React.useRef を使用してエラーを回避
+  const dateInputRef = React.useRef(null);
+
   const member = members.find((m) => m.id === selectedMemberId);
 
   // カレンダーで日付が選択された時の処理（YYYY-MM-DD -> M/D週）
   const handleDateChange = (e) => {
-    const val = e.target.value; // "2026-10-05"
+    const val = e.target.value;
     if (!val) return;
     const dateObj = new Date(val);
     if (!isNaN(dateObj.getTime())) {
       const m = dateObj.getMonth() + 1;
       const d = dateObj.getDate();
       setWeek(`${m}/${d}週`);
+    }
+  };
+
+  // アイコンクリック時にカレンダーを強制オープン
+  const openDatePicker = () => {
+    if (dateInputRef.current) {
+      if (typeof dateInputRef.current.showPicker === "function") {
+        dateInputRef.current.showPicker();
+      } else {
+        dateInputRef.current.click();
+      }
     }
   };
 
@@ -478,7 +302,6 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
         )
       : 0;
   } else {
-    // 月累計モード：各項目の月累計実績に対する達成率の平均
     avgRate = currentItems.length
       ? Math.round(
           currentItems.reduce((sum, it) => {
@@ -544,16 +367,25 @@ function SheetTab({ members, selectedMemberId, setSelectedMemberId }) {
         ))}
       </div>
       
-      {/* 対象週設定バー（labelでラップしてアイコンクリックでカレンダーが開くようにする） */}
-      <div className="flex items-center gap-2.5 bg-[#161B22] border border-[#30363D] rounded-xl px-3.5 py-2.5 text-xs text-[#C9D1D9]">
-        <label className="cursor-pointer p-1 -m-1 text-[#8B949E] hover:text-[#F2B04B] transition-colors flex items-center">
+      {/* 対象週設定バー */}
+      <div className="flex items-center gap-2.5 bg-[#161B22] border border-[#30363D] rounded-xl px-3.5 py-2.5 text-xs text-[#C9D1D9] relative">
+        <button
+          type="button"
+          onClick={openDatePicker}
+          className="p-1 -m-1 text-[#8B949E] hover:text-[#F2B04B] transition-colors cursor-pointer rounded-md focus:outline-none flex items-center justify-center"
+          title="カレンダーから日付を選択"
+        >
           <Calendar size={16} />
-          <input
-            type="date"
-            onChange={handleDateChange}
-            className="sr-only absolute opacity-0 pointer-events-none"
-          />
-        </label>
+        </button>
+
+        {/* 隠し日付入力フィールド（クリック時に showPicker を発火） */}
+        <input
+          type="date"
+          ref={dateInputRef}
+          onChange={handleDateChange}
+          className="absolute opacity-0 pointer-events-none w-0 h-0"
+        />
+
         <span className="text-[#8B949E] shrink-0">対象週:</span>
         <input
           value={week}
